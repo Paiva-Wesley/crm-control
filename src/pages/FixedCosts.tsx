@@ -41,6 +41,13 @@ export function FixedCosts() {
                 supabase.from('products').select('*').eq('active', true).order('name')
             ]);
 
+            // Fetch costs from view
+            const { data: costsView } = await supabase.from('product_costs_view').select('id, cmv');
+            const costMap: Record<number, number> = {};
+            costsView?.forEach((c: any) => {
+                costMap[c.id] = c.cmv;
+            });
+
             if (costsRes.error) throw costsRes.error;
 
             // Ensure numeric values are parsed (Supabase returns numeric as string)
@@ -50,7 +57,12 @@ export function FixedCosts() {
             }));
 
             setCosts(parsedCosts);
-            setProducts(productsRes.data || []);
+            // Attach cost to products for easier access
+            const productsWithCost = (productsRes.data || []).map(p => ({
+                ...p,
+                cost_price_view: costMap[p.id] || 0
+            }));
+            setProducts(productsWithCost);
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -132,7 +144,7 @@ export function FixedCosts() {
             // Fetch product cost
             const prod = products.find(p => p.id === productId);
             if (prod) {
-                const unitCost = prod.cost_price || 0;
+                const unitCost = (prod as any).cost_price_view || 0;
                 newVal = unitCost * (days || 0);
                 newConfig.unit_cost = unitCost;
             } else {
@@ -446,7 +458,7 @@ export function FixedCosts() {
                                                         >
                                                             <option value="">Selecione...</option>
                                                             {products.map(p => (
-                                                                <option key={p.id} value={p.id}>{p.name} (R$ {p.cost_price?.toFixed(2)})</option>
+                                                                <option key={p.id} value={p.id}>{p.name} (R$ {(p as any).cost_price_view?.toFixed(2)})</option>
                                                             ))}
                                                         </select>
                                                     ) : (

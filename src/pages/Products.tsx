@@ -116,8 +116,8 @@ export function Products() {
                                         <td className="px-4 py-4 text-slate-300">{prod.category || '-'}</td>
                                         <td className="px-4 py-4 text-slate-300">R$ {Number(prod.sale_price).toFixed(2)}</td>
                                         <td className="px-4 py-4 text-slate-400">R$ {Number(prod.cmv).toFixed(2)}</td>
-                                        <td className={`px-4 py-4 ${prod.gross_margin > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                            R$ {Number(prod.gross_margin).toFixed(2)}
+                                        <td className={`px-4 py-4 ${prod.gross_profit > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            R$ {Number(prod.gross_profit).toFixed(2)}
                                         </td>
                                         <td className="px-4 py-4">
                                             <span className={`

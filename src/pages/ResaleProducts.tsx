@@ -1,6 +1,5 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState } from 'react';
-import { Save, DollarSign, Search, AlertCircle, TrendingUp, Filter, Plus } from 'lucide-react';
+import { DollarSign, Search, AlertCircle, TrendingUp, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Product, BusinessSettings } from '../types';
 import { Modal } from '../components/ui/Modal';
@@ -8,6 +7,7 @@ import { Modal } from '../components/ui/Modal';
 export function ResaleProducts() {
     const [loading, setLoading] = useState(true);
     const [products, setProducts] = useState<Product[]>([]);
+    const [productCosts, setProductCosts] = useState<Record<number, number>>({});
     const [settings, setSettings] = useState<BusinessSettings | null>(null);
 
     // Global Parameters
@@ -33,12 +33,17 @@ export function ResaleProducts() {
             const { data: settingsData } = await supabase.from('business_settings').select('*').single();
             const { data: costs } = await supabase.from('fixed_costs').select('monthly_value');
             const { data: fees } = await supabase.from('fees').select('percentage');
+            // Fetch revenue from new table
+            const { data: revenueData } = await supabase.from('monthly_revenue').select('revenue');
 
             let revenue = 33000;
+            if (revenueData && revenueData.length > 0) {
+                const totalRev = revenueData.reduce((acc, curr) => acc + Number(curr.revenue), 0);
+                revenue = totalRev / 12 || 33000;
+            }
+
             if (settingsData) {
                 setSettings(settingsData);
-                const totalRev = Object.values(settingsData.monthly_revenue).reduce((acc: any, val: any) => acc + Number(val), 0);
-                revenue = Number(totalRev) / 12 || 33000;
             }
 
             const totalFixed = (costs || []).reduce((acc, curr) => acc + Number(curr.monthly_value), 0);
@@ -49,16 +54,30 @@ export function ResaleProducts() {
             setFixedCostPercent(fixedPercent);
             setVariableRateTotal(totalFees);
 
-            // 2. Fetch Products (Only 'Bebidas' or created here)
-            // We'll filter by category 'Bebidas' to keep it separate.
+            // 2. Fetch Products
             const { data: prods } = await supabase
                 .from('products')
                 .select('*')
                 .eq('active', true)
-                .ilike('category', '%Bebidas%') // Filter for Bebidas
+                .ilike('category', '%Bebidas%')
                 .order('name');
 
             setProducts(prods || []);
+
+            // 3. Fetch Costs
+            if (prods && prods.length > 0) {
+                const ids = prods.map(p => p.id);
+                const { data: costsData } = await supabase
+                    .from('product_costs') // View name
+                    .select('id, cmv')
+                    .in('id', ids);
+
+                const costMap: Record<number, number> = {};
+                costsData?.forEach((c: any) => {
+                    costMap[c.id] = c.cmv;
+                });
+                setProductCosts(costMap);
+            }
 
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -68,38 +87,101 @@ export function ResaleProducts() {
     }
 
     function handleLocalUpdate(id: number, field: 'cost_price' | 'sale_price', value: string) {
-        // Update local state for real-time calculation
-        // Allow empty string to become 0
+        // Only updates local display state temporarily
         const numValue = value === '' ? 0 : parseFloat(value);
-        if (isNaN(numValue)) return; // Invalid number
+        if (isNaN(numValue)) return;
 
-        setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: numValue } : p));
+        if (field === 'sale_price') {
+            setProducts(prev => prev.map(p => p.id === id ? { ...p, sale_price: numValue } : p));
+        } else {
+            setProductCosts(prev => ({ ...prev, [id]: numValue }));
+        }
     }
 
     async function handleSaveProduct(id: number, field: 'cost_price' | 'sale_price', value: number) {
         try {
-            await supabase.from('products').update({ [field]: value }).eq('id', id);
+            if (field === 'sale_price') {
+                await supabase.from('products').update({ sale_price: value }).eq('id', id);
+            } else {
+                // Update Cost = Update Ingredient
+                // Find Ingredient linked to this product (assuming 1:1 for Bebidas)
+                const { data: links } = await supabase
+                    .from('product_ingredients')
+                    .select('ingredient_id')
+                    .eq('product_id', id)
+                    .single();
+
+                if (links) {
+                    await supabase.from('ingredients').update({ cost_per_unit: value }).eq('id', links.ingredient_id);
+                } else {
+                    // Create ingredient if missing (Fallback/Lazy Fix)
+                    const product = products.find(p => p.id === id);
+                    if (product) {
+                        const { data: ing } = await supabase.from('ingredients').insert({
+                            name: product.name,
+                            unit: 'un',
+                            cost_per_unit: value,
+                            category: 'Insumo',
+                            company_id: 1 // Default
+                        }).select().single();
+
+                        if (ing) {
+                            await supabase.from('product_ingredients').insert({
+                                product_id: id,
+                                ingredient_id: ing.id,
+                                quantity: 1,
+                                company_id: 1
+                            });
+                        }
+                    }
+                }
+            }
         } catch (error) {
             console.error('Error updating product:', error);
-            alert('Erro ao salvar alteração. Verifique sua conexão.');
+            alert('Erro ao salvar alteração.');
         }
     }
 
     async function handleCreateItem(e: React.FormEvent) {
         e.preventDefault();
         try {
-            const payload = {
+            const cost = parseFloat(newItemCost) || 0;
+            const price = parseFloat(newItemPrice) || 0;
+
+            // 1. Create Ingredient first
+            const { data: ing, error: ingError } = await supabase.from('ingredients').insert({
                 name: newItemName,
-                category: 'Bebidas', // Enforce category
-                cost_price: parseFloat(newItemCost) || 0,
-                sale_price: parseFloat(newItemPrice) || 0,
-                active: true
-            };
+                unit: 'un',
+                cost_per_unit: cost,
+                category: 'Insumo', // Start as Insumo
+                company_id: 1
+            }).select().single();
 
-            const { data, error } = await supabase.from('products').insert(payload).select().single();
-            if (error) throw error;
+            if (ingError) throw ingError;
 
-            setProducts(prev => [...prev, data]);
+            // 2. Create Product
+            const { data: prod, error: prodError } = await supabase.from('products').insert({
+                name: newItemName,
+                category: 'Bebidas',
+                sale_price: price,
+                active: true,
+                company_id: 1
+            }).select().single();
+
+            if (prodError) throw prodError;
+
+            // 3. Link
+            await supabase.from('product_ingredients').insert({
+                product_id: prod.id,
+                ingredient_id: ing.id,
+                quantity: 1,
+                company_id: 1
+            });
+
+            // Update UI
+            setProducts(prev => [...prev, prod]);
+            setProductCosts(prev => ({ ...prev, [prod.id]: cost }));
+
             setIsModalOpen(false);
             setNewItemName('');
             setNewItemCost('');
@@ -107,7 +189,7 @@ export function ResaleProducts() {
             alert('Item adicionado com sucesso!');
         } catch (error) {
             console.error('Error creating item:', error);
-            alert('Erro ao criar item. Verifique os dados.');
+            alert('Erro ao criar item.');
         }
     }
 
@@ -120,6 +202,8 @@ export function ResaleProducts() {
     const desiredProfit = settings?.desired_profit_percent || 15;
     const totalBurdenPercent = fixedCostPercent + variableRateTotal + platformTax + desiredProfit;
     const itemMarkup = totalBurdenPercent < 100 ? (1 / (1 - (totalBurdenPercent / 100))) : 0;
+
+    if (loading) return <div className="p-8 text-center text-slate-400">Carregando...</div>;
 
     return (
         <div className="space-y-6">
@@ -164,7 +248,6 @@ export function ResaleProducts() {
                                     <th className="px-2 py-3 text-right">CMV %</th>
                                     <th className="px-2 py-3 text-right font-bold text-emerald-400">Lucro R$</th>
                                     <th className="px-2 py-3 text-right font-bold">Lucro %</th>
-                                    <th className="px-2 py-3 text-right font-bold">Lucro %</th>
                                     <th className="px-2 py-3 text-right text-slate-400 border-l border-dark-700">Preço Médio</th>
                                     <th className="px-2 py-3 text-right text-blue-400 bg-blue-900/10 border-l border-dark-700">Preço Tabela</th>
                                     <th className="px-2 py-3 text-right text-amber-400 bg-amber-900/10 border-l border-dark-700">Ideal iFood</th>
@@ -173,13 +256,13 @@ export function ResaleProducts() {
                             <tbody className="divide-y divide-dark-700">
                                 {filteredProducts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                                        <td colSpan={10} className="px-4 py-8 text-center text-slate-400">
                                             Nenhuma bebida encontrada. Clique em "Nova Bebida" para cadastrar.
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredProducts.map(product => {
-                                        const cost = product.cost_price || 0;
+                                        const cost = productCosts[product.id] || 0;
                                         const price = product.sale_price || 0;
 
                                         // Calculations
@@ -216,17 +299,13 @@ export function ResaleProducts() {
                                                 <td className={`px-2 py-3 text-right font-bold ${profitVal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                                     R$ {profitVal.toFixed(2)}
                                                 </td>
-                                                <td className={`px-2 py-3 text-right font-bold ${profitPercent >= settings?.desired_profit_percent! ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                <td className={`px-2 py-3 text-right font-bold ${profitPercent >= (settings?.desired_profit_percent || 0) ? 'text-emerald-400' : 'text-amber-400'}`}>
                                                     {profitPercent.toFixed(1)}%
                                                 </td>
 
-                                                <td className={`px-2 py-3 text-right font-bold ${profitPercent >= settings?.desired_profit_percent! ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                    {profitPercent.toFixed(1)}%
-                                                </td>
-
-                                                {/* Avg Price from Import */}
+                                                {/* Avg Price removed as column removed from DB, or we can keep it purely optional if we have a way to inject it, but safer to skip or show placeholder */}
                                                 <td className="px-2 py-3 text-right text-slate-400 border-l border-dark-700 text-xs">
-                                                    {product.average_sale_price ? `R$ ${product.average_sale_price.toFixed(2)}` : '-'}
+                                                    -
                                                 </td>
 
                                                 {/* Input Price (Table Price) */}
@@ -296,7 +375,7 @@ export function ResaleProducts() {
                 </div>
             </div>
 
-            {/* New Drink Modal */}
+            {/* New Drink Modal (Same as before) */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}

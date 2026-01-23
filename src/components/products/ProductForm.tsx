@@ -103,7 +103,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
                     productId={createdProductId}
                     productName={formData.name}
                     salePrice={parseFloat(formData.sale_price) || 0}
-                    productSalesQty={product?.last_sales_qty}
+                    productSalesQty={0}
                 />
 
                 <div className="modal-footer mt-6">

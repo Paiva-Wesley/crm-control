@@ -7,15 +7,13 @@ export interface Product {
     active: boolean;
     created_at?: string;
     category?: string;
-    cost_price?: number;
-    last_sales_qty?: number;
-    last_sales_total?: number;
-    average_sale_price?: number;
     is_combo?: boolean;
+    company_id?: number;
 }
 
 export interface Ingredient {
     id: number;
+    company_id?: number;
     name: string;
     unit: string;
     cost_per_unit: number;
@@ -25,6 +23,7 @@ export interface Ingredient {
 
 export interface ProductIngredient {
     id: number;
+    company_id?: number;
     product_id: number;
     ingredient_id: number;
     quantity: number;
@@ -33,20 +32,25 @@ export interface ProductIngredient {
 
 export interface ProductCombo {
     id: number;
+    company_id?: number;
     parent_product_id: number;
     child_product_id: number;
     quantity: number;
     child_product?: Product; // For fetching details
 }
 
-export interface ProductWithCost extends Product {
+export interface ProductProfitability extends Product {
     cmv: number;
-    gross_margin: number;
+    gross_profit: number;
     margin_percent: number;
 }
 
+// Deprecated or Alias for legacy support if needed, but better to use ProductProfitability
+export interface ProductWithCost extends ProductProfitability { }
+
 export interface FixedCost {
     id: number;
+    company_id?: number;
     name: string;
     monthly_value: number;
     category: string;
@@ -67,6 +71,7 @@ export interface FixedCost {
 
 export interface Channel {
     id: number;
+    company_id?: number;
     name: string;
     fee_percentage: number;
     active: boolean;
@@ -82,20 +87,24 @@ export interface Fee {
 
 export interface BusinessSettings {
     id: number;
+    company_id?: number;
     desired_profit_percent: number;
     platform_tax_rate: number;
-    monthly_revenue: {
-        jan: number;
-        feb: number;
-        mar: number;
-        apr: number;
-        may: number;
-        jun: number;
-        jul: number;
-        aug: number;
-        sep: number;
-        oct: number;
-        nov: number;
-        dec: number;
-    };
+}
+
+export interface MonthlyRevenue {
+    id: number;
+    company_id: number;
+    year: number;
+    month: number; // 1-12
+    revenue: number;
+}
+
+export interface Sale {
+    id: number;
+    company_id: number;
+    product_id: number;
+    quantity: number;
+    sale_price: number;
+    sold_at: string;
 }

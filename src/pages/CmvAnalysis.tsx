@@ -3,13 +3,18 @@ import {
     PieChart, Activity, TrendingUp, DollarSign, AlertCircle, ArrowDown, ArrowUp
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { BusinessSettings, ProductWithCost } from '../types';
+import type { ProductWithCost } from '../types';
+
+interface ProductWithMetrics extends ProductWithCost {
+    last_sales_qty: number;
+    last_sales_total: number;
+}
 
 export function CmvAnalysis() {
     const [loading, setLoading] = useState(true);
 
     // Data State
-    const [products, setProducts] = useState<ProductWithCost[]>([]);
+    const [products, setProducts] = useState<ProductWithMetrics[]>([]);
     const [fixedCostsTotal, setFixedCostsTotal] = useState(0);
     const [variableRateTotal, setVariableRateTotal] = useState(0); // Tax %
     const [platformTaxRate, setPlatformTaxRate] = useState(0);
@@ -22,29 +27,51 @@ export function CmvAnalysis() {
         try {
             setLoading(true);
 
-            // 1. Fetch Products with Costs (View typically has calculated CMV)
-            // Note: product_costs_view might not strictly include new columns if cached, 
-            // but usually * does. If not, we might need to join or assume they are there.
-            // Current ProductWithCost type includes them as optional.
+            // 1. Fetch Products with Costs
             const { data: prods } = await supabase
                 .from('product_costs_view')
                 .select('*')
-                .gt('last_sales_qty', 0) // Only interested in what sold
-                .order('last_sales_qty', { ascending: false });
+                .order('name');
 
-            setProducts(prods || []);
+            // 2. Fetch Sales Data (last 30 days or all? typical analysis)
+            // Let's assume all sales in sales table or filtered by some logic. 
+            // The prompt implied "imported sales", so let's just grab all for now.
+            const { data: sales } = await supabase.from('sales').select('product_id, quantity, sale_price');
 
-            // 2. Fetch Fixed Costs
+            // 3. Aggregate Sales
+            const salesMap = new Map<number, { qty: number, total: number }>();
+            sales?.forEach(s => {
+                const current = salesMap.get(s.product_id) || { qty: 0, total: 0 };
+                salesMap.set(s.product_id, {
+                    qty: current.qty + s.quantity,
+                    total: current.total + (s.quantity * s.sale_price)
+                });
+            });
+
+            // 4. Merge Data
+            const productsWithMetrics = (prods || []).map(p => {
+                const metrics = salesMap.get(p.id) || { qty: 0, total: 0 };
+                return {
+                    ...p,
+                    last_sales_qty: metrics.qty,
+                    last_sales_total: metrics.total
+                };
+            }).filter(p => p.last_sales_qty > 0) // Only show items with sales
+                .sort((a, b) => b.last_sales_qty - a.last_sales_qty);
+
+            setProducts(productsWithMetrics as any); // Cast to any or extend type locally
+
+            // 5. Fetch Fixed Costs
             const { data: costs } = await supabase.from('fixed_costs').select('monthly_value');
             const totalFixed = (costs || []).reduce((acc, curr) => acc + Number(curr.monthly_value), 0);
             setFixedCostsTotal(totalFixed);
 
-            // 3. Fetch Variable Fees (Taxes)
+            // 6. Fetch Variable Fees (Taxes)
             const { data: fees } = await supabase.from('fees').select('percentage');
             const totalFees = (fees || []).reduce((acc, curr) => acc + Number(curr.percentage), 0);
             setVariableRateTotal(totalFees);
 
-            // 4. Fetch Settings (for Platform Tax)
+            // 7. Fetch Settings (for Platform Tax)
             const { data: settings } = await supabase.from('business_settings').select('platform_tax_rate').single();
             if (settings) {
                 setPlatformTaxRate(settings.platform_tax_rate || 0);
@@ -65,7 +92,7 @@ export function CmvAnalysis() {
         // Use pre-calculated total if strictly reliable, or recalc to be safe?
         // Let's use last_sales_total if > 0, else recalc
         if (p.last_sales_total && p.last_sales_total > 0) return acc + p.last_sales_total;
-        return acc + ((p.last_sales_qty || 0) * (p.average_sale_price || p.sale_price));
+        return acc + ((p.last_sales_qty || 0) * p.sale_price);
     }, 0);
 
     // 2. CMV Real Total (Soma de: Qtd * CMV Unitário)
@@ -184,7 +211,7 @@ export function CmvAnalysis() {
                         <tbody className="divide-y divide-dark-700">
                             {products.map(p => {
                                 const qty = p.last_sales_qty || 0;
-                                const price = p.average_sale_price || p.sale_price;
+                                const price = p.sale_price;
                                 const revenue = qty * price;
                                 const totalCmvCost = qty * (p.cmv || 0);
                                 const grossProfit = revenue - totalCmvCost; // Crude Gross Profit (Review - CMV)

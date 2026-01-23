@@ -5,9 +5,13 @@ import { supabase } from '../lib/supabase';
 import type { BusinessSettings } from '../types';
 import { ImportSalesModal } from '../components/business/ImportSalesModal';
 
+interface BusinessSettingsExtended extends BusinessSettings {
+    monthly_revenue: Record<string, number>;
+}
+
 export function BusinessData() {
     const [loading, setLoading] = useState(true);
-    const [settings, setSettings] = useState<BusinessSettings | null>(null);
+    const [settings, setSettings] = useState<BusinessSettingsExtended | null>(null);
     const [fixedCostsTotal, setFixedCostsTotal] = useState(0);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
@@ -21,18 +25,38 @@ export function BusinessData() {
 
             // 1. Settings
             const { data: settingsData } = await supabase.from('business_settings').select('*').single();
+            const { data: revenueData } = await supabase.from('monthly_revenue').select('*');
+
+            // Transform revenue array to object for UI state compatibility
+            // Default 0 for all months
+            const revenueMap: any = {
+                jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
+                jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
+            };
+
+            const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+            if (revenueData) {
+                revenueData.forEach((rev: any) => {
+                    const monthName = monthNames[rev.month - 1];
+                    if (monthName) {
+                        revenueMap[monthName] = rev.revenue;
+                    }
+                });
+            }
+
             if (settingsData) {
-                setSettings(settingsData);
+                setSettings({
+                    ...settingsData,
+                    monthly_revenue: revenueMap
+                } as any); // Type assertion needed until we fully refactor state type or use new type
             } else {
                 setSettings({
                     id: 0,
                     desired_profit_percent: 15,
                     platform_tax_rate: 18,
-                    monthly_revenue: {
-                        jan: 33000, feb: 33000, mar: 33000, apr: 33000, may: 33000, jun: 33000,
-                        jul: 33000, aug: 33000, sep: 33000, oct: 33000, nov: 33000, dec: 33000
-                    }
-                });
+                    monthly_revenue: revenueMap // Use default map
+                } as any);
             }
 
             // 2. Fixed Costs Total
@@ -51,15 +75,42 @@ export function BusinessData() {
         if (!settings) return;
         try {
             const { data } = await supabase.from('business_settings').select('id').single();
+
+            // Save main settings
             if (data) {
                 await supabase.from('business_settings').update({
                     desired_profit_percent: settings.desired_profit_percent,
                     platform_tax_rate: settings.platform_tax_rate,
-                    monthly_revenue: settings.monthly_revenue
                 }).eq('id', data.id);
             } else {
-                await supabase.from('business_settings').insert(settings);
+                await supabase.from('business_settings').insert({
+                    desired_profit_percent: settings.desired_profit_percent,
+                    platform_tax_rate: settings.platform_tax_rate,
+                });
             }
+
+            // Save Monthly Revenue
+            // Need to map UI object back to table rows
+            const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            const year = 2026; // Default year
+            const company_id = 1; // Default company
+
+            const revenueEntries = Object.entries((settings as any).monthly_revenue).map(([key, value]) => {
+                const monthIndex = monthNames.indexOf(key) + 1;
+                return {
+                    company_id,
+                    year,
+                    month: monthIndex,
+                    revenue: value
+                };
+            });
+
+            // Upsert each month
+            // Note: Supabase upsert requires ON CONFLICT constraint which we added (company_id, year, month)
+            const { error } = await supabase.from('monthly_revenue').upsert(revenueEntries, { onConflict: 'company_id, year, month' });
+
+            if (error) throw error;
+
             alert('Configurações salvas com sucesso!');
         } catch (error) {
             console.error('Error saving settings:', error);
@@ -229,12 +280,12 @@ export function BusinessData() {
                                             <input
                                                 type="number"
                                                 className="bg-transparent text-right text-white w-28 border-none focus:ring-0 p-0 outline-none hover:text-blue-300 focus:text-blue-400 transition-colors arrow-hide"
-                                                value={value}
+                                                value={value as number}
                                                 onChange={e => setSettings({
                                                     ...settings,
                                                     monthly_revenue: {
                                                         ...settings.monthly_revenue,
-                                                        [month]: parseFloat(e.target.value)
+                                                        [month]: parseFloat(e.target.value) || 0
                                                     }
                                                 })}
                                             />

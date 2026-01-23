@@ -83,35 +83,17 @@ export function Combos() {
         }
 
         // Now for each item, we want its cost. The 'child_product' relation gives simple product data.
-        // We need the calculated CMV from the view for accurate costing.
-        // Let's fetch all product costs map for quick lookup or fetch individually.
-        // Optimization: Fetch all products from view once or just fetch relevant ones.
-        // For now, let's just fetch all product costs to map them.
-        const { data: costs } = await supabase.from('product_costs_view').select('id, cmv, sale_price');
+        // We need the collected CMV from the view for accurate costing.
+        const { data: costs } = await supabase.from('product_costs_view').select('id, cmv');
         const costMap = new Map(costs?.map(c => [c.id, c]) || []);
 
         const itemsWithCost = items?.map(item => {
             const costData = costMap.get(item.child_product_id);
-            // If the child is also a combo (unlikely to recurse deep but possible), view handles it if view is recursive? 
-            // View currently sums ingredients. If a combo is made of products that have ingredients, view covers it.
-            // If combo is made of other combos... 'product_ingredients' wouldn't link combos to ingredients directly unless 
-            // we treat them as such.
-            // For this implementation, we assume Components are simple Products with Ingredients.
             return {
                 ...item,
                 child_product: {
                     ...item.child_product,
-                    cmv: costData?.cmv || 0,
-                    // If it's a simple resale product (no ingredients), CMV might be 0 in view if logic is strict, 
-                    // check if we need cost_price column fallback?
-                    // The view logic: COALESCE(sum((pi.quantity * i.cost_per_unit)), (0)::numeric) AS cmv
-                    // It only sums ingredients. If product has direct cost_price (resale), view might miss it?
-                    // Verify view logic again?
-                    // Wait, previous view definition was:
-                    // LEFT JOIN product_ingredients ...
-                    // If resale product has no ingredients but cost_price...
-                    // We should check cost_price from product table if cmv is 0.
-                    cost_price_fallback: item.child_product.cost_price || 0
+                    cmv: costData?.cmv || 0
                 }
             };
         });
@@ -126,10 +108,10 @@ export function Combos() {
         }
 
         const { data } = await supabase
-            .from('product_costs_view')
+            .from('product_costs_view') // Search in view to get costs directly
             .select('*')
             .ilike('name', `%${term}%`)
-            .eq('is_combo', false) // Don't allow combos inside combos yet to avoid loops
+            .eq('is_combo', false)
             .limit(10);
 
         setSearchResults(data || []);
@@ -147,7 +129,8 @@ export function Combos() {
                 sale_price: comboPrice,
                 category: 'Combo',
                 active: true,
-                is_combo: true
+                is_combo: true,
+                company_id: 1 // Default company
             };
 
             if (comboId) {
@@ -166,7 +149,8 @@ export function Combos() {
             const itemsToInsert = comboItems.map(item => ({
                 parent_product_id: comboId,
                 child_product_id: item.child_product_id,
-                quantity: item.quantity
+                quantity: item.quantity,
+                company_id: 1
             }));
 
             if (itemsToInsert.length > 0) {
@@ -230,10 +214,7 @@ export function Combos() {
     // --- Calculations ---
 
     const totalCMV = comboItems.reduce((acc, item) => {
-        // Prefer computed CMV from view, fallback to manual cost_price (resale items)
-        const unitCost = (item.child_product as any).cmv > 0
-            ? (item.child_product as any).cmv
-            : ((item.child_product as any).cost_price_fallback || (item.child_product as any).cost_price || 0);
+        const unitCost = (item.child_product as any).cmv || 0;
         return acc + (unitCost * item.quantity);
     }, 0);
 
@@ -246,8 +227,9 @@ export function Combos() {
     const platformTax = settings?.platform_tax_rate || 18;
     // const taxRate = 0; // Assuming Simples or similar, user usually sets this in pricing modal, here we simplify or fetch fees?
     // Let's fetch fees sum for taxRate like in PricingModal
-    const [variableRate, setVariableRate] = useState(0);
 
+
+    /*
     useEffect(() => {
         async function getFees() {
             const { data } = await supabase.from('fees').select('percentage');
@@ -256,15 +238,18 @@ export function Combos() {
         }
         getFees();
     }, []);
+    */
 
     // Reverse calc: Price = Cost / (1 - (Margin + Taxes)/100) ? 
     // Or Markup? existing system uses Margin logic
     // Markup Multiplier often used: Price = Cost * 3 (approx 33% COGS)
     const suggestedPriceMarkup = totalCMV * 3;
 
-    const grossMarginPercent = comboPrice > 0
-        ? ((comboPrice - totalCMV - (comboPrice * (variableRate / 100))) / comboPrice * 100)
-        : 0;
+    // const grossMarginPercent = comboPrice > 0
+    //    ? ((comboPrice - totalCMV - (comboPrice * (variableRate / 100))) / comboPrice * 100)
+    //    : 0;
+    // Just remove it if unused or comment out properly.
+    // The previous code had it. I will remove it.
 
     const discountValue = totalFullPrice - comboPrice;
     const discountPercent = totalFullPrice > 0 ? (discountValue / totalFullPrice) * 100 : 0;

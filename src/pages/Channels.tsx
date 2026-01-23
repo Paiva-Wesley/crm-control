@@ -2,10 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { SalesChannel, Fee } from '../types';
+import type { Channel, Fee } from '../types';
 import { Modal } from '../components/ui/Modal';
 
-interface ChannelWithFees extends SalesChannel {
+interface ChannelWithFees extends Channel {
     fees: Fee[];
 
 }
