@@ -26,8 +26,8 @@ export function BusinessData() {
             setLoading(true);
 
             // 1. Settings
-            const { data: settingsData } = await supabase.from('business_settings').select('*').single();
-            const { data: revenueData } = await supabase.from('monthly_revenue').select('*');
+            const { data: settingsData } = await supabase.from('business_settings').select('*').eq('company_id', companyId).limit(1).maybeSingle();
+            const { data: revenueData } = await supabase.from('monthly_revenue').select('*').eq('company_id', companyId);
 
             // Transform revenue array to object for UI state compatibility
             // Default 0 for all months
@@ -62,7 +62,7 @@ export function BusinessData() {
             }
 
             // 2. Fixed Costs Total
-            const { data: costs } = await supabase.from('fixed_costs').select('monthly_value');
+            const { data: costs } = await supabase.from('fixed_costs').select('monthly_value').eq('company_id', companyId);
             const total = (costs || []).reduce((acc, curr) => acc + (parseFloat(curr.monthly_value as any) || 0), 0);
             setFixedCostsTotal(total);
 
@@ -76,7 +76,7 @@ export function BusinessData() {
     async function handleSaveSettings() {
         if (!settings) return;
         try {
-            const { data } = await supabase.from('business_settings').select('id').single();
+            const { data } = await supabase.from('business_settings').select('id').eq('company_id', companyId).limit(1).maybeSingle();
 
             // Save main settings
             if (data) {

@@ -32,7 +32,7 @@ export function ResaleProducts() {
             setLoading(true);
 
             // 1. Fetch Business Settings & Costs
-            const { data: settingsData } = await supabase.from('business_settings').select('*').eq('company_id', companyId).single();
+            const { data: settingsData } = await supabase.from('business_settings').select('*').eq('company_id', companyId).limit(1).maybeSingle();
             const { data: costs } = await supabase.from('fixed_costs').select('monthly_value').eq('company_id', companyId);
             const { data: fees } = await supabase.from('fees').select('percentage');
             // Fetch revenue from new table

@@ -3,6 +3,7 @@ import {
     PieChart, Activity, TrendingUp, DollarSign, AlertCircle, ArrowDown, ArrowUp
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { ProductWithCost } from '../types';
 
 interface ProductWithMetrics extends ProductWithCost {
@@ -11,6 +12,7 @@ interface ProductWithMetrics extends ProductWithCost {
 }
 
 export function CmvAnalysis() {
+    const { companyId } = useAuth();
     const [loading, setLoading] = useState(true);
 
     // Data State
@@ -72,7 +74,7 @@ export function CmvAnalysis() {
             setVariableRateTotal(totalFees);
 
             // 7. Fetch Settings (for Platform Tax)
-            const { data: settings } = await supabase.from('business_settings').select('platform_tax_rate').single();
+            const { data: settings } = await supabase.from('business_settings').select('platform_tax_rate').eq('company_id', companyId).limit(1).maybeSingle();
             if (settings) {
                 setPlatformTaxRate(settings.platform_tax_rate || 0);
             }

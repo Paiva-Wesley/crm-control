@@ -61,7 +61,7 @@ export function Combos() {
     }
 
     async function fetchSettings() {
-        const { data } = await supabase.from('business_settings').select('*').single();
+        const { data } = await supabase.from('business_settings').select('*').eq('company_id', companyId).limit(1).maybeSingle();
         setSettings(data);
     }
 
