@@ -6,6 +6,7 @@ interface AuthContextType {
     user: User | null;
     session: Session | null;
     companyId: number | null;
+    companyName: string | null;
     loading: boolean;
     signOut: () => Promise<void>;
 }
@@ -14,6 +15,7 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     session: null,
     companyId: null,
+    companyName: null,
     loading: true,
     signOut: async () => { },
 });
@@ -24,6 +26,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [companyId, setCompanyId] = useState<number | null>(null);
+    const [companyName, setCompanyName] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -48,6 +51,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 fetchCompany(session.user.id);
             } else {
                 setCompanyId(null);
+                setCompanyName(null);
                 setLoading(false);
             }
         });
@@ -59,7 +63,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             const { data, error } = await supabase
                 .from('company_members')
-                .select('company_id')
+                .select('company_id, companies(name)')
                 .eq('user_id', userId)
                 .single();
 
@@ -69,8 +73,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
             if (data) {
                 setCompanyId(data.company_id);
+                setCompanyName((data as any).companies?.name || null);
             } else {
                 setCompanyId(null);
+                setCompanyName(null);
             }
         } catch (err) {
             console.error('Unexpected error fetching company:', err);
@@ -82,12 +88,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const signOut = async () => {
         await supabase.auth.signOut();
         setCompanyId(null);
+        setCompanyName(null);
         setUser(null);
         setSession(null);
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, companyId, loading, signOut }}>
+        <AuthContext.Provider value={{ user, session, companyId, companyName, loading, signOut }}>
             {!loading && children}
         </AuthContext.Provider>
     );

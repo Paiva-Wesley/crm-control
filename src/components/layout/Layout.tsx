@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface NavGroupProps {
@@ -38,7 +38,7 @@ export function Layout() {
     const [sidebarOpen, setSidebarOpen] = React.useState(true);
     const location = useLocation();
     const [openGroup, setOpenGroup] = useState<string | null>(null);
-    const { signOut } = useAuth();
+    const { signOut, user, companyName } = useAuth();
 
     React.useEffect(() => {
         const path = location.pathname;
@@ -274,7 +274,25 @@ export function Layout() {
                     </NavLink>
                 </nav>
 
-                <div className="p-4 border-t border-dark-700">
+                <div className="p-4 border-t border-dark-700 space-y-3">
+                    {/* Profile Card */}
+                    {sidebarOpen ? (
+                        <div className="flex items-center gap-3 px-3 py-3 bg-dark-900 rounded-lg border border-dark-700">
+                            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                <User size={18} className="text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-100 truncate">{companyName || 'Sem empresa'}</p>
+                                <p className="text-xs text-slate-500 truncate">{user?.email || ''}</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex justify-center">
+                            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center" title={`${companyName} - ${user?.email}`}>
+                                <User size={18} className="text-primary" />
+                            </div>
+                        </div>
+                    )}
                     <button
                         onClick={() => signOut()}
                         className="flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-dark-700 hover:text-red-300 w-full transition-colors duration-200"
