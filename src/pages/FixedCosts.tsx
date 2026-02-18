@@ -43,12 +43,12 @@ export function FixedCosts() {
         try {
             setLoading(true);
             const [costsRes, productsRes] = await Promise.all([
-                supabase.from('fixed_costs').select('*').order('id'),
-                supabase.from('products').select('*').eq('active', true).order('name')
+                supabase.from('fixed_costs').select('*').eq('company_id', companyId).order('id'),
+                supabase.from('products').select('*').eq('active', true).eq('company_id', companyId).order('name')
             ]);
 
             // Fetch costs from view
-            const { data: costsView } = await supabase.from('product_costs_view').select('id, cmv');
+            const { data: costsView } = await supabase.from('product_costs_view').select('id, cmv').eq('company_id', companyId);
             const costMap: Record<number, number> = {};
             costsView?.forEach((c: any) => {
                 costMap[c.id] = c.cmv;

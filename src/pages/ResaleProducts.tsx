@@ -3,8 +3,10 @@ import { DollarSign, Search, AlertCircle, TrendingUp, Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase';
 import type { Product, BusinessSettings } from '../types';
 import { Modal } from '../components/ui/Modal';
+import { useAuth } from '../contexts/AuthContext';
 
 export function ResaleProducts() {
+    const { companyId } = useAuth();
     const [loading, setLoading] = useState(true);
     const [products, setProducts] = useState<Product[]>([]);
     const [productCosts, setProductCosts] = useState<Record<number, number>>({});
@@ -30,11 +32,11 @@ export function ResaleProducts() {
             setLoading(true);
 
             // 1. Fetch Business Settings & Costs
-            const { data: settingsData } = await supabase.from('business_settings').select('*').single();
-            const { data: costs } = await supabase.from('fixed_costs').select('monthly_value');
+            const { data: settingsData } = await supabase.from('business_settings').select('*').eq('company_id', companyId).single();
+            const { data: costs } = await supabase.from('fixed_costs').select('monthly_value').eq('company_id', companyId);
             const { data: fees } = await supabase.from('fees').select('percentage');
             // Fetch revenue from new table
-            const { data: revenueData } = await supabase.from('monthly_revenue').select('revenue');
+            const { data: revenueData } = await supabase.from('monthly_revenue').select('revenue').eq('company_id', companyId);
 
             let revenue = 33000;
             if (revenueData && revenueData.length > 0) {
@@ -59,6 +61,7 @@ export function ResaleProducts() {
                 .from('products')
                 .select('*')
                 .eq('active', true)
+                .eq('company_id', companyId)
                 .ilike('category', '%Bebidas%')
                 .order('name');
 
@@ -122,7 +125,7 @@ export function ResaleProducts() {
                             unit: 'un',
                             cost_per_unit: value,
                             category: 'Insumo',
-                            company_id: 1 // Default
+                            company_id: companyId
                         }).select().single();
 
                         if (ing) {
@@ -130,7 +133,7 @@ export function ResaleProducts() {
                                 product_id: id,
                                 ingredient_id: ing.id,
                                 quantity: 1,
-                                company_id: 1
+                                company_id: companyId
                             });
                         }
                     }
@@ -154,7 +157,7 @@ export function ResaleProducts() {
                 unit: 'un',
                 cost_per_unit: cost,
                 category: 'Insumo', // Start as Insumo
-                company_id: 1
+                company_id: companyId
             }).select().single();
 
             if (ingError) throw ingError;
@@ -165,7 +168,7 @@ export function ResaleProducts() {
                 category: 'Bebidas',
                 sale_price: price,
                 active: true,
-                company_id: 1
+                company_id: companyId
             }).select().single();
 
             if (prodError) throw prodError;
@@ -175,7 +178,7 @@ export function ResaleProducts() {
                 product_id: prod.id,
                 ingredient_id: ing.id,
                 quantity: 1,
-                company_id: 1
+                company_id: companyId
             });
 
             // Update UI
