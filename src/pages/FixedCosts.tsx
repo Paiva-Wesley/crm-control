@@ -113,15 +113,13 @@ export function FixedCosts() {
     }
 
     async function handleDeleteCost(id: number) {
-        if (!confirm('Excluir este custo?')) return;
-
-        const previousCosts = costs;
+        const previousCosts = [...costs];
         setCosts(prev => prev.filter(c => c.id !== id));
-        toast.success('Custo excluído');
 
         try {
             const { error } = await supabase.from('fixed_costs').delete().eq('id', id);
             if (error) throw error;
+            toast.success('Custo excluído');
         } catch (error) {
             console.error('Error deleting cost:', error);
             toast.error('Erro ao excluir custo');
@@ -302,7 +300,7 @@ export function FixedCosts() {
                                                 variant="danger"
                                                 size="sm"
                                                 onClick={() => handleDeleteCost(cost.id)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                                className="opacity-50 hover:opacity-100 transition-opacity"
                                             >
                                                 <Trash2 size={14} />
                                             </Button>
@@ -371,7 +369,7 @@ export function FixedCosts() {
                                                 variant="danger"
                                                 size="sm"
                                                 onClick={() => handleDeleteCost(cost.id)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                                className="opacity-50 hover:opacity-100 transition-opacity"
                                             >
                                                 <Trash2 size={14} />
                                             </Button>
@@ -440,7 +438,7 @@ export function FixedCosts() {
                                                 variant="danger"
                                                 size="sm"
                                                 onClick={() => handleDeleteCost(cost.id)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                                className="opacity-50 hover:opacity-100 transition-opacity"
                                             >
                                                 <Trash2 size={14} />
                                             </Button>
@@ -545,7 +543,7 @@ export function FixedCosts() {
                                                     variant="danger"
                                                     size="sm"
                                                     onClick={() => handleDeleteCost(cost.id)}
-                                                    className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                                    className="opacity-50 hover:opacity-100 transition-opacity"
                                                 >
                                                     <Trash2 size={14} />
                                                 </Button>
@@ -618,7 +616,7 @@ export function FixedCosts() {
                                                 variant="danger"
                                                 size="sm"
                                                 onClick={() => handleDeleteCost(cost.id)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                                className="opacity-50 hover:opacity-100 transition-opacity"
                                             >
                                                 <Trash2 size={14} />
                                             </Button>
