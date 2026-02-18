@@ -19,6 +19,16 @@ export interface Ingredient {
     cost_per_unit: number;
     created_at?: string;
     category?: 'Insumo' | 'Embalagem' | 'Acompanhamento';
+    is_composite?: boolean;
+}
+
+export interface IngredientComponent {
+    id?: number;
+    parent_ingredient_id: number;
+    child_ingredient_id: number;
+    quantity: number;
+    company_id?: string;
+    ingredient?: Ingredient; // joined child ingredient
 }
 
 export interface ProductIngredient {

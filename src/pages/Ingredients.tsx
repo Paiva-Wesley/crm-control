@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Plus, Search, Edit2, Trash2, Utensils, Calculator, Beaker, Box, Save } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Utensils, Calculator, Beaker, Box, Save, Layers, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Ingredient } from '../types';
+import type { Ingredient, IngredientComponent } from '../types';
 import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
@@ -17,6 +17,11 @@ const CATEGORIES: { id: IngredientCategory; label: string; icon: typeof Beaker }
     { id: 'Embalagem', label: 'Embalagens', icon: Box },
     { id: 'Acompanhamento', label: 'Acompanhamentos', icon: Utensils }
 ];
+
+interface ComponentRow {
+    child_ingredient_id: number;
+    quantity: string;
+}
 
 export function Ingredients() {
     const { companyId } = useAuth();
@@ -34,12 +39,17 @@ export function Ingredients() {
         unit: string;
         cost_per_unit: string;
         category: IngredientCategory;
+        is_composite: boolean;
     }>({
         name: '',
         unit: 'kg',
         cost_per_unit: '',
-        category: 'Insumo'
+        category: 'Insumo',
+        is_composite: false
     });
+
+    // Composite sub-ingredients
+    const [components, setComponents] = useState<ComponentRow[]>([]);
 
     const [calcValues, setCalcValues] = useState({
         packagePrice: '',
@@ -62,8 +72,9 @@ export function Ingredients() {
         setFormData(prev => ({ ...prev, category: activeTab }));
     }, [activeTab]);
 
-    // Calculator effect with multiplier
+    // Calculator effect with multiplier (only for non-composite)
     useEffect(() => {
+        if (formData.is_composite) return;
         const price = parseFloat(calcValues.packagePrice);
         const amount = parseFloat(calcValues.packageAmount);
         const multiplier = parseFloat(calcValues.unitMultiplier) || 1;
@@ -72,7 +83,27 @@ export function Ingredients() {
             const costPerUnit = (price / amount) * multiplier;
             setFormData(prev => ({ ...prev, cost_per_unit: costPerUnit.toFixed(4) }));
         }
-    }, [calcValues]);
+    }, [calcValues, formData.is_composite]);
+
+    // Auto-calculate composite cost when components change
+    const compositeCost = useMemo(() => {
+        if (!formData.is_composite || components.length === 0) return 0;
+        return components.reduce((total, comp) => {
+            const child = ingredients.find(i => i.id === comp.child_ingredient_id);
+            const qty = parseFloat(comp.quantity) || 0;
+            if (child) {
+                return total + (child.cost_per_unit * qty);
+            }
+            return total;
+        }, 0);
+    }, [components, ingredients, formData.is_composite]);
+
+    // Sync composite cost to form
+    useEffect(() => {
+        if (formData.is_composite && compositeCost > 0) {
+            setFormData(prev => ({ ...prev, cost_per_unit: compositeCost.toFixed(4) }));
+        }
+    }, [compositeCost, formData.is_composite]);
 
     async function fetchIngredients() {
         try {
@@ -112,6 +143,15 @@ export function Ingredients() {
         };
     }, [ingredients, activeTab]);
 
+    // Available ingredients for composite (exclude self when editing, exclude composites to prevent deep nesting)
+    const availableChildIngredients = useMemo(() => {
+        return ingredients.filter(i => {
+            if (editingId && i.id === editingId) return false;
+            if (i.is_composite) return false;
+            return true;
+        });
+    }, [ingredients, editingId]);
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         try {
@@ -121,13 +161,21 @@ export function Ingredients() {
                 return;
             }
 
+            if (formData.is_composite && components.length === 0) {
+                toast.error('Adicione pelo menos um sub-insumo');
+                return;
+            }
+
             const payload = {
                 name: formData.name.trim(),
                 unit: formData.unit,
                 cost_per_unit: costValue,
                 category: formData.category,
-                company_id: companyId
+                company_id: companyId,
+                is_composite: formData.is_composite
             };
+
+            let ingredientId = editingId;
 
             if (editingId) {
                 const { error } = await supabase
@@ -136,10 +184,45 @@ export function Ingredients() {
                     .eq('id', editingId);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { data, error } = await supabase
                     .from('ingredients')
-                    .insert(payload);
+                    .insert(payload)
+                    .select('id')
+                    .single();
                 if (error) throw error;
+                ingredientId = data.id;
+            }
+
+            // Save components for composite ingredients
+            if (formData.is_composite && ingredientId) {
+                // Delete existing components
+                await supabase
+                    .from('ingredient_components')
+                    .delete()
+                    .eq('parent_ingredient_id', ingredientId);
+
+                // Insert new components
+                const componentPayloads = components
+                    .filter(c => c.child_ingredient_id && parseFloat(c.quantity) > 0)
+                    .map(c => ({
+                        parent_ingredient_id: ingredientId,
+                        child_ingredient_id: c.child_ingredient_id,
+                        quantity: parseFloat(c.quantity),
+                        company_id: companyId
+                    }));
+
+                if (componentPayloads.length > 0) {
+                    const { error } = await supabase
+                        .from('ingredient_components')
+                        .insert(componentPayloads);
+                    if (error) throw error;
+                }
+            } else if (!formData.is_composite && editingId) {
+                // If switching from composite to non-composite, remove components
+                await supabase
+                    .from('ingredient_components')
+                    .delete()
+                    .eq('parent_ingredient_id', editingId);
             }
 
             setIsModalOpen(false);
@@ -181,22 +264,56 @@ export function Ingredients() {
         }
     }
 
-    function handleEdit(ingredient: Ingredient) {
+    async function handleEdit(ingredient: Ingredient) {
         setEditingId(ingredient.id);
         setFormData({
             name: ingredient.name,
             unit: ingredient.unit,
             cost_per_unit: ingredient.cost_per_unit.toString(),
-            category: ingredient.category || 'Insumo'
+            category: ingredient.category || 'Insumo',
+            is_composite: ingredient.is_composite || false
         });
         setCalcValues({ packagePrice: '', packageAmount: '', unitMultiplier: '1' });
+
+        // Load components if composite
+        if (ingredient.is_composite) {
+            const { data } = await supabase
+                .from('ingredient_components')
+                .select('child_ingredient_id, quantity')
+                .eq('parent_ingredient_id', ingredient.id);
+
+            if (data && data.length > 0) {
+                setComponents(data.map(c => ({
+                    child_ingredient_id: c.child_ingredient_id,
+                    quantity: c.quantity.toString()
+                })));
+            } else {
+                setComponents([]);
+            }
+        } else {
+            setComponents([]);
+        }
+
         setIsModalOpen(true);
     }
 
     function resetForm() {
-        setFormData({ name: '', unit: 'kg', cost_per_unit: '', category: activeTab });
+        setFormData({ name: '', unit: 'kg', cost_per_unit: '', category: activeTab, is_composite: false });
         setCalcValues({ packagePrice: '', packageAmount: '', unitMultiplier: '1' });
+        setComponents([]);
         setEditingId(null);
+    }
+
+    function addComponent() {
+        setComponents(prev => [...prev, { child_ingredient_id: 0, quantity: '' }]);
+    }
+
+    function removeComponent(index: number) {
+        setComponents(prev => prev.filter((_, i) => i !== index));
+    }
+
+    function updateComponent(index: number, field: keyof ComponentRow, value: string | number) {
+        setComponents(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c));
     }
 
     const getUnitOptions = (category: IngredientCategory) => {
@@ -272,8 +389,8 @@ export function Ingredients() {
                             key={cat.id}
                             onClick={() => setActiveTab(cat.id)}
                             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === cat.id
-                                    ? 'text-primary border-primary bg-primary/10'
-                                    : 'text-slate-400 border-transparent hover:text-white hover:bg-dark-800'
+                                ? 'text-primary border-primary bg-primary/10'
+                                : 'text-slate-400 border-transparent hover:text-white hover:bg-dark-800'
                                 }`}
                         >
                             <Icon size={18} />
@@ -319,7 +436,7 @@ export function Ingredients() {
                             <thead>
                                 <tr className="border-b border-dark-700">
                                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Nome</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Categoria</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Tipo</th>
                                     <th className="px-4 py-3 text-center text-sm font-medium text-slate-400 uppercase tracking-wider">Unidade</th>
                                     <th className="px-4 py-3 text-right text-sm font-medium text-slate-400 uppercase tracking-wider">Custo Unit.</th>
                                     <th className="px-4 py-3 text-right text-sm font-medium text-slate-400 uppercase tracking-wider">Custo/100g ou un</th>
@@ -340,8 +457,15 @@ export function Ingredients() {
                                         return (
                                             <tr key={ing.id} className="border-b border-dark-700 hover:bg-dark-700/50 transition-colors">
                                                 <td className="px-4 py-4">
-                                                    <p className="font-semibold text-slate-100">{ing.name}</p>
-                                                    <p className="text-xs text-slate-500">ID: {ing.id}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-semibold text-slate-100">{ing.name}</p>
+                                                        {ing.is_composite && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400 border border-purple-500/20">
+                                                                <Layers size={12} />
+                                                                Composto
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
@@ -412,7 +536,7 @@ export function Ingredients() {
                                 required
                                 value={formData.name}
                                 onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="Ex: Queijo Mussarela, Saco Kraft"
+                                placeholder="Ex: Queijo Mussarela, Molho Bolonhesa"
                                 className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200"
                             />
                         </div>
@@ -438,57 +562,172 @@ export function Ingredients() {
                         </div>
                     </div>
 
-                    {/* Cost Calculator with multiplier */}
-                    <div className="bg-dark-700/50 border border-dark-600 rounded-lg p-4 space-y-4">
-                        <div className="flex items-center gap-2 text-primary">
-                            <Calculator size={20} />
-                            <h4 className="text-xs font-semibold uppercase">Calculadora de Custo</h4>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Preço da Embalagem (R$)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={calcValues.packagePrice}
-                                    onChange={e => setCalcValues(prev => ({ ...prev, packagePrice: e.target.value }))}
-                                    placeholder="Ex: 50,00"
-                                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Qtd na Embalagem</label>
-                                <input
-                                    type="number"
-                                    step="0.001"
-                                    value={calcValues.packageAmount}
-                                    onChange={e => setCalcValues(prev => ({ ...prev, packageAmount: e.target.value }))}
-                                    placeholder={`Ex: 1000 (${formData.unit})`}
-                                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Multiplicador</label>
-                                <input
-                                    type="number"
-                                    step="0.001"
-                                    value={calcValues.unitMultiplier}
-                                    onChange={e => setCalcValues(prev => ({ ...prev, unitMultiplier: e.target.value }))}
-                                    placeholder="Ex: 1"
-                                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200"
-                                />
-                                <p className="text-xs text-slate-500 mt-1">Use 0.001 para converter kg→g</p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-3 border-t border-dark-600">
-                            <span className="text-sm text-slate-400">Custo Calculado:</span>
-                            <span className="text-lg font-bold text-primary">
-                                R$ {formData.cost_per_unit || '0.0000'}
-                            </span>
+                    {/* Composite Toggle */}
+                    <div className="flex items-center gap-3 p-3 bg-dark-700/50 border border-dark-600 rounded-lg">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const newIsComposite = !formData.is_composite;
+                                setFormData(prev => ({
+                                    ...prev,
+                                    is_composite: newIsComposite,
+                                    cost_per_unit: newIsComposite ? '' : prev.cost_per_unit
+                                }));
+                                if (newIsComposite && components.length === 0) {
+                                    addComponent();
+                                }
+                            }}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.is_composite ? 'bg-purple-500' : 'bg-dark-600'}`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_composite ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                        <div>
+                            <p className="text-sm font-medium text-slate-200 flex items-center gap-2">
+                                <Layers size={16} className="text-purple-400" />
+                                Insumo Composto
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                Feito a partir de outros insumos (ex: Molho Bolonhesa = Carne + Calabresa + Milho)
+                            </p>
                         </div>
                     </div>
+
+                    {/* Composite Sub-ingredients */}
+                    {formData.is_composite && (
+                        <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold text-purple-400 flex items-center gap-2">
+                                    <Layers size={16} />
+                                    Sub-Insumos
+                                </h4>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={addComponent}
+                                    className="text-purple-400 hover:text-purple-300"
+                                >
+                                    <Plus size={16} className="mr-1" />
+                                    Adicionar
+                                </Button>
+                            </div>
+
+                            {components.length === 0 ? (
+                                <p className="text-sm text-slate-500 text-center py-4">
+                                    Adicione os sub-insumos que compõem este insumo.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {components.map((comp, index) => {
+                                        const childIngredient = ingredients.find(i => i.id === comp.child_ingredient_id);
+                                        const lineCost = childIngredient ? (childIngredient.cost_per_unit * (parseFloat(comp.quantity) || 0)) : 0;
+
+                                        return (
+                                            <div key={index} className="flex items-center gap-2 bg-dark-800/50 rounded-lg p-2">
+                                                <select
+                                                    value={comp.child_ingredient_id || ''}
+                                                    onChange={e => updateComponent(index, 'child_ingredient_id', parseInt(e.target.value))}
+                                                    className="flex-1 px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition duration-200"
+                                                >
+                                                    <option value="">Selecione um insumo...</option>
+                                                    {availableChildIngredients.map(ing => (
+                                                        <option key={ing.id} value={ing.id}>
+                                                            {ing.name} (R$ {Number(ing.cost_per_unit).toFixed(4)}/{ing.unit})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        step="0.001"
+                                                        placeholder="Qtd"
+                                                        value={comp.quantity}
+                                                        onChange={e => updateComponent(index, 'quantity', e.target.value)}
+                                                        className="w-24 px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 text-sm text-right focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition duration-200"
+                                                    />
+                                                    {childIngredient && (
+                                                        <span className="text-xs text-slate-500 w-8">{childIngredient.unit}</span>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs text-emerald-400 w-24 text-right whitespace-nowrap">
+                                                    R$ {lineCost.toFixed(4)}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeComponent(index)}
+                                                    className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* Composite Cost Total */}
+                            <div className="flex items-center justify-between pt-3 border-t border-purple-500/20">
+                                <span className="text-sm font-medium text-slate-400">Custo Total Calculado:</span>
+                                <span className="text-lg font-bold text-purple-400">
+                                    R$ {compositeCost.toFixed(4)}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Cost Calculator with multiplier (only for non-composite) */}
+                    {!formData.is_composite && (
+                        <div className="bg-dark-700/50 border border-dark-600 rounded-lg p-4 space-y-4">
+                            <div className="flex items-center gap-2 text-primary">
+                                <Calculator size={20} />
+                                <h4 className="text-xs font-semibold uppercase">Calculadora de Custo</h4>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Preço da Embalagem (R$)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={calcValues.packagePrice}
+                                        onChange={e => setCalcValues(prev => ({ ...prev, packagePrice: e.target.value }))}
+                                        placeholder="Ex: 50,00"
+                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Qtd na Embalagem</label>
+                                    <input
+                                        type="number"
+                                        step="0.001"
+                                        value={calcValues.packageAmount}
+                                        onChange={e => setCalcValues(prev => ({ ...prev, packageAmount: e.target.value }))}
+                                        placeholder={`Ex: 1000 (${formData.unit})`}
+                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Multiplicador</label>
+                                    <input
+                                        type="number"
+                                        step="0.001"
+                                        value={calcValues.unitMultiplier}
+                                        onChange={e => setCalcValues(prev => ({ ...prev, unitMultiplier: e.target.value }))}
+                                        placeholder="Ex: 1"
+                                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">Use 0.001 para converter kg→g</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-3 border-t border-dark-600">
+                                <span className="text-sm text-slate-400">Custo Calculado:</span>
+                                <span className="text-lg font-bold text-primary">
+                                    R$ {formData.cost_per_unit || '0.0000'}
+                                </span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Manual Cost + Unit */}
                     <div className="grid grid-cols-2 gap-4">
@@ -503,9 +742,13 @@ export function Ingredients() {
                                     value={formData.cost_per_unit}
                                     onChange={e => setFormData({ ...formData, cost_per_unit: e.target.value })}
                                     placeholder="0.00"
-                                    className="w-full pl-10 pr-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200"
+                                    disabled={formData.is_composite}
+                                    className={`w-full pl-10 pr-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition duration-200 ${formData.is_composite ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 />
                             </div>
+                            {formData.is_composite && (
+                                <p className="text-xs text-purple-400 mt-1">Calculado automaticamente pelos sub-insumos</p>
+                            )}
                         </div>
 
                         <div>
@@ -526,7 +769,11 @@ export function Ingredients() {
                     {/* Tip */}
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                         <p className="text-xs text-blue-400">
-                            <strong>Dica:</strong> Para sólidos (queijo, carne), prefira kg ou g. Para líquidos, use ml ou L. Embalagens por unidade.
+                            {formData.is_composite ? (
+                                <><strong>Dica:</strong> Adicione todos os sub-insumos com suas quantidades. O custo será calculado automaticamente pela soma. Depois, esse insumo poderá ser usado normalmente na ficha técnica dos produtos.</>
+                            ) : (
+                                <><strong>Dica:</strong> Para sólidos (queijo, carne), prefira kg ou g. Para líquidos, use ml ou L. Embalagens por unidade.</>
+                            )}
                         </p>
                     </div>
 
