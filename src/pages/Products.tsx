@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { ProductWithCost } from '../types';
-import { Modal } from '../components/ui/Modal';
-import { ProductForm } from '../components/products/ProductForm';
+import { ProductModal } from '../components/products/ProductModal';
 import { useSubscription } from '../hooks/useSubscription';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
@@ -40,7 +39,6 @@ export function Products() {
     }
 
     const filteredProducts = products
-        .filter(p => !p.category?.toLowerCase().includes('bebidas'))
         .filter(p =>
             p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -191,19 +189,11 @@ export function Products() {
                 )}
             </div>
 
-            {isModalOpen && (
-                <Modal
-                    isOpen={isModalOpen}
-                    onClose={handleCloseModal}
-                    title={editingProduct ? `Editar ${editingProduct.name}` : 'Novo Produto'}
-                >
-                    <ProductForm
-                        product={editingProduct}
-                        onSuccess={handleCloseModal}
-                        onCancel={() => setIsModalOpen(false)}
-                    />
-                </Modal>
-            )}
+            <ProductModal
+                isOpen={isModalOpen}
+                onClose={handleCloseModal}
+                editingProduct={editingProduct}
+            />
         </div>
     );
 }
