@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { ProductWithCost } from '../../types';
 import { RecipeEditor } from './RecipeEditor';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ProductFormProps {
     product: ProductWithCost | null;
@@ -11,6 +12,7 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) {
+    const { companyId } = useAuth();
     const [formData, setFormData] = useState({
         name: product?.name || '',
         category: product?.category || '',
@@ -28,7 +30,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
                 name: formData.name,
                 category: formData.category,
                 sale_price: parseFloat(formData.sale_price),
-                active: formData.active
+                active: formData.active,
+                company_id: companyId
             };
 
             if (product) {

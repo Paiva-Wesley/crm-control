@@ -8,3 +8,4 @@ export * from './ResaleProducts';
 export * from './Combos';
 export { Channels } from './Channels';
 export { Dashboard } from './Dashboard';
+export { Plans } from './Plans';

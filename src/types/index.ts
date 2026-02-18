@@ -108,3 +108,26 @@ export interface Sale {
     sale_price: number;
     sold_at: string;
 }
+
+export interface Plan {
+    id: number;
+    name: string;
+    price: number;
+    features: string[];
+    limits: {
+        products: number;
+        ingredients: number;
+        users: number;
+    };
+    created_at?: string;
+}
+
+export interface Subscription {
+    id: number;
+    company_id: number;
+    plan_id: number;
+    status: 'active' | 'past_due' | 'canceled' | 'trialing';
+    current_period_start: string;
+    current_period_end: string;
+    plan?: Plan;
+}

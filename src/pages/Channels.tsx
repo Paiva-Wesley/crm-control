@@ -1,9 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Settings } from 'lucide-react';
+import { Plus, Trash2, Settings, Store } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Channel, Fee } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 import { Modal } from '../components/ui/Modal';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Button } from '../components/ui/Button';
+import { useToast } from '../contexts/ToastContext';
 
 interface ChannelWithFees extends Channel {
     fees: Fee[];
@@ -11,6 +15,7 @@ interface ChannelWithFees extends Channel {
 }
 
 export function Channels() {
+    const { companyId } = useAuth();
     const [channels, setChannels] = useState<ChannelWithFees[]>([]);
     const [allFees, setAllFees] = useState<Fee[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,12 +24,16 @@ export function Channels() {
     const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
     const [selectedChannel, setSelectedChannel] = useState<ChannelWithFees | null>(null);
     const [selectedFeeId, setSelectedFeeId] = useState<string>('');
+    const { toast } = useToast();
 
     const [channelName, setChannelName] = useState('');
 
     useEffect(() => {
         fetchData();
     }, []);
+    // ... (omitting fetch data logic to avoid replacing too much, wait, I can't skip lines in replace_file_content)
+    // Actually, I should use replace_file_content for small blocks.
+    // Let's replace the top hooks part.
 
     async function fetchData() {
         const [channelsRes, feesRes] = await Promise.all([
@@ -54,7 +63,13 @@ export function Channels() {
 
     async function handleCreateChannel(e: React.FormEvent) {
         e.preventDefault();
-        await supabase.from('sales_channels').insert({ name: channelName });
+        const { error } = await supabase.from('sales_channels').insert({ name: channelName, company_id: companyId });
+
+        if (error) {
+            toast.error('Erro ao criar canal');
+            return;
+        }
+        toast.success('Canal criado com sucesso!');
         setIsModalOpen(false);
         setChannelName('');
         fetchData();
@@ -62,8 +77,13 @@ export function Channels() {
 
     async function handleDeleteChannel(id: number) {
         if (!confirm('Excluir canal?')) return;
-        await supabase.from('sales_channels').delete().eq('id', id);
-        fetchData();
+        const { error } = await supabase.from('sales_channels').delete().eq('id', id);
+        if (error) {
+            toast.error('Erro ao excluir canal');
+        } else {
+            toast.success('Canal excluído');
+            fetchData();
+        }
     }
 
     async function handleAddFee() {
@@ -71,7 +91,8 @@ export function Channels() {
 
         await supabase.from('channel_fees').insert({
             channel_id: selectedChannel.id,
-            fee_id: parseInt(selectedFeeId)
+            fee_id: parseInt(selectedFeeId),
+            company_id: companyId
         });
 
         setSelectedFeeId('');
@@ -112,51 +133,68 @@ export function Channels() {
         <div className="page-container">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Canais de Venda</h2>
-                <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-                    <Plus size={20} /> Novo Canal
-                </button>
+                <Button onClick={() => setIsModalOpen(true)} leftIcon={<Plus size={20} />}>
+                    Novo Canal
+                </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {channels.map(channel => {
-                    const totalFees = channel.fees.reduce((acc, f) => acc + f.percentage, 0);
+            {channels.length === 0 ? (
+                <EmptyState
+                    icon={Store}
+                    title="Nenhum canal de venda"
+                    description="Cadastre seus canais de venda (iFood, Salão, etc) para calcular as taxas corretamente."
+                    actionLabel="Criar Primeiro Canal"
+                    onAction={() => setIsModalOpen(true)}
+                />
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {channels.map(channel => {
+                        const totalFees = channel.fees.reduce((acc, f) => acc + f.percentage, 0);
 
-                    return (
-                        <div key={channel.id} className="card">
-                            <div className="flex justify-between items-start mb-4">
-                                <h3 className="text-xl font-bold">{channel.name}</h3>
-                                <button onClick={() => handleDeleteChannel(channel.id)} className="text-danger hover:bg-slate-800 p-1 rounded">
-                                    <Trash2 size={18} />
-                                </button>
+                        return (
+                            <div key={channel.id} className="card">
+                                <div className="flex justify-between items-start mb-4">
+                                    <h3 className="text-xl font-bold">{channel.name}</h3>
+                                    <Button
+                                        variant="danger"
+                                        size="sm"
+                                        onClick={() => handleDeleteChannel(channel.id)}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <Trash2 size={18} />
+                                    </Button>
+                                </div>
+
+                                <div className="bg-secondary p-3 rounded-lg mb-4">
+                                    <div className="text-secondary text-sm mb-1">Custo Total de Taxas</div>
+                                    <div className="text-2xl font-bold text-warning">{totalFees.toFixed(2)}%</div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-bold text-secondary uppercase">Taxas Aplicadas</h4>
+                                    {channel.fees.length === 0 && <p className="text-sm text-secondary italic">Nenhuma taxa configurada</p>}
+
+                                    {channel.fees.map(fee => (
+                                        <div key={fee.id} className="flex justify-between text-sm border-b border-color pb-1">
+                                            <span>{fee.name}</span>
+                                            <span>{fee.percentage}%</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <Button
+                                    variant="ghost"
+                                    className="w-full mt-4 border border-color"
+                                    onClick={() => openFeeModal(channel)}
+                                    leftIcon={<Settings size={16} />}
+                                >
+                                    Configurar Taxas
+                                </Button>
                             </div>
-
-                            <div className="bg-secondary p-3 rounded-lg mb-4">
-                                <div className="text-secondary text-sm mb-1">Custo Total de Taxas</div>
-                                <div className="text-2xl font-bold text-warning">{totalFees.toFixed(2)}%</div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <h4 className="text-sm font-bold text-secondary uppercase">Taxas Aplicadas</h4>
-                                {channel.fees.length === 0 && <p className="text-sm text-secondary italic">Nenhuma taxa configurada</p>}
-
-                                {channel.fees.map(fee => (
-                                    <div key={fee.id} className="flex justify-between text-sm border-b border-color pb-1">
-                                        <span>{fee.name}</span>
-                                        <span>{fee.percentage}%</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <button
-                                className="btn btn-ghost w-full mt-4 border border-color"
-                                onClick={() => openFeeModal(channel)}
-                            >
-                                <Settings size={16} /> Configurar Taxas
-                            </button>
-                        </div>
-                    );
-                })}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Canal">
                 <form onSubmit={handleCreateChannel} className="flex flex-col gap-4">
@@ -170,7 +208,7 @@ export function Channels() {
                         />
                     </div>
                     <div className="modal-footer">
-                        <button type="submit" className="btn btn-primary">Salvar</button>
+                        <Button type="submit">Salvar</Button>
                     </div>
                 </form>
             </Modal>
@@ -194,25 +232,27 @@ export function Channels() {
                                 <option key={f.id} value={f.id}>{f.name} ({f.percentage}%)</option>
                             ))}
                     </select>
-                    <button
+                    <Button
                         onClick={handleAddFee}
                         disabled={!selectedFeeId}
-                        className="btn btn-primary"
+                        className="h-10 w-10 p-0"
                     >
                         <Plus size={20} />
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="space-y-2">
                     {selectedChannel?.fees.map(fee => (
                         <div key={fee.id} className="flex justify-between items-center bg-secondary p-2 rounded">
                             <span>{fee.name} ({fee.percentage}%)</span>
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleRemoveFee(fee.id)}
-                                className="text-danger hover:text-red-400"
+                                className="text-danger hover:text-red-400 h-6 w-6 p-0"
                             >
                                 <Trash2 size={16} />
-                            </button>
+                            </Button>
                         </div>
                     ))}
                 </div>

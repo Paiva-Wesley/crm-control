@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface NavGroupProps {
     id: string;
@@ -37,6 +38,7 @@ export function Layout() {
     const [sidebarOpen, setSidebarOpen] = React.useState(true);
     const location = useLocation();
     const [openGroup, setOpenGroup] = useState<string | null>(null);
+    const { signOut } = useAuth();
 
     React.useEffect(() => {
         const path = location.pathname;
@@ -260,7 +262,27 @@ export function Layout() {
                         <Store size={20} />
                         {sidebarOpen && <span>Canais de Venda</span>}
                     </NavLink>
+                    <NavLink
+                        to="/plans"
+                        className={({ isActive }) => `
+                            flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
+                            ${isActive ? 'bg-primary text-white' : 'text-slate-400 hover:bg-dark-700 hover:text-white'}
+                        `}
+                    >
+                        <Star size={20} />
+                        {sidebarOpen && <span>Planos</span>}
+                    </NavLink>
                 </nav>
+
+                <div className="p-4 border-t border-dark-700">
+                    <button
+                        onClick={() => signOut()}
+                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-dark-700 hover:text-red-300 w-full transition-colors duration-200"
+                    >
+                        <LogOut size={20} />
+                        {sidebarOpen && <span>Sair</span>}
+                    </button>
+                </div>
             </aside>
 
             {/* Overlay for mobile */}

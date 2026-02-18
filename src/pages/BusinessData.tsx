@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Save, Upload } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { BusinessSettings } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 import { ImportSalesModal } from '../components/business/ImportSalesModal';
 
 interface BusinessSettingsExtended extends BusinessSettings {
@@ -10,6 +11,7 @@ interface BusinessSettingsExtended extends BusinessSettings {
 }
 
 export function BusinessData() {
+    const { companyId } = useAuth();
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<BusinessSettingsExtended | null>(null);
     const [fixedCostsTotal, setFixedCostsTotal] = useState(0);
@@ -86,6 +88,7 @@ export function BusinessData() {
                 await supabase.from('business_settings').insert({
                     desired_profit_percent: settings.desired_profit_percent,
                     platform_tax_rate: settings.platform_tax_rate,
+                    company_id: companyId
                 });
             }
 
@@ -93,12 +96,11 @@ export function BusinessData() {
             // Need to map UI object back to table rows
             const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
             const year = 2026; // Default year
-            const company_id = 1; // Default company
 
             const revenueEntries = Object.entries((settings as any).monthly_revenue).map(([key, value]) => {
                 const monthIndex = monthNames.indexOf(key) + 1;
                 return {
-                    company_id,
+                    company_id: companyId,
                     year,
                     month: monthIndex,
                     revenue: value

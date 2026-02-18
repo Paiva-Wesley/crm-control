@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, DollarSign, Package, ShoppingCart } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { OnboardingChecklist } from '../components/dashboard/OnboardingChecklist';
 
 export function Dashboard() {
     const [stats, setStats] = useState({
@@ -83,6 +84,8 @@ export function Dashboard() {
                 <h2 className="text-2xl font-bold text-slate-100">Dashboard</h2>
                 <p className="text-slate-400 mt-1">Visão geral do sistema de custos</p>
             </div>
+
+            <OnboardingChecklist />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {cards.map((card, index) => (

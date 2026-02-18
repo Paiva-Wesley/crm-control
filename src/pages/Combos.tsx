@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { ProductWithCost, ProductCombo, BusinessSettings } from '../types';
 import { Layers, Plus, Trash2, Save, Calculator, Search } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Combos() {
+    const { companyId } = useAuth();
     const [combos, setCombos] = useState<ProductWithCost[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCombo, setSelectedCombo] = useState<ProductWithCost | null>(null);
@@ -130,7 +132,7 @@ export function Combos() {
                 category: 'Combo',
                 active: true,
                 is_combo: true,
-                company_id: 1 // Default company
+                company_id: companyId
             };
 
             if (comboId) {
@@ -150,7 +152,7 @@ export function Combos() {
                 parent_product_id: comboId,
                 child_product_id: item.child_product_id,
                 quantity: item.quantity,
-                company_id: 1
+                company_id: companyId
             }));
 
             if (itemsToInsert.length > 0) {

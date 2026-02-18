@@ -3,15 +3,21 @@ import { useLocation } from 'react-router-dom';
 import { Plus, Trash2, Users, Bike, Coffee, Briefcase, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { FixedCost, Product } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Button } from '../components/ui/Button';
+import { useToast } from '../contexts/ToastContext';
 
 // Grouping for Tabs
 type GroupTab = 'Equipe' | 'Despesas';
 
 export function FixedCosts() {
     const [loading, setLoading] = useState(true);
+    const { companyId } = useAuth();
     const [costs, setCosts] = useState<FixedCost[]>([]);
     const [products, setProducts] = useState<Product[]>([]); // For snack linking
     const [activeTab, setActiveTab] = useState<GroupTab>('Equipe');
+    const { toast } = useToast();
 
     // Accordion State
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -81,15 +87,18 @@ export function FixedCosts() {
                 name: defaultName,
                 category,
                 monthly_value: 0,
-                config: initialConfig
+                config: initialConfig,
+                company_id: companyId
             }).select().single();
 
             if (error) throw error;
             setCosts(prev => [...prev, data]);
             // Ensure section is open
             setOpenSections(prev => ({ ...prev, [category]: true }));
+            toast.success('Item adicionado');
         } catch (error) {
             console.error('Error adding cost:', error);
+            toast.error('Erro ao adicionar item');
         }
     }
 
@@ -105,11 +114,18 @@ export function FixedCosts() {
 
     async function handleDeleteCost(id: number) {
         if (!confirm('Excluir este custo?')) return;
+
+        const previousCosts = costs;
         setCosts(prev => prev.filter(c => c.id !== id));
+        toast.success('Custo excluído');
+
         try {
-            await supabase.from('fixed_costs').delete().eq('id', id);
+            const { error } = await supabase.from('fixed_costs').delete().eq('id', id);
+            if (error) throw error;
         } catch (error) {
             console.error('Error deleting cost:', error);
+            toast.error('Erro ao excluir custo');
+            setCosts(previousCosts);
         }
     }
 
@@ -206,19 +222,21 @@ export function FixedCosts() {
                     <h2 className="text-2xl font-bold text-slate-100">Custos Fixos e Mão de Obra</h2>
                     <p className="text-slate-400 text-sm">Gerencie sua equipe e despesas mensais</p>
                 </div>
-                <div className="mt-4 md:mt-0 flex bg-dark-800 rounded-lg p-1 border border-dark-700">
-                    <button
+                <div className="mt-4 md:mt-0 flex bg-dark-800 rounded-lg p-1 border border-dark-700 gap-1">
+                    <Button
+                        variant={activeTab === 'Equipe' ? 'primary' : 'ghost'}
                         onClick={() => setActiveTab('Equipe')}
-                        className={`px-4 py-2 rounded transition-all ${activeTab === 'Equipe' ? 'bg-primary text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                        className={`transition-all ${activeTab !== 'Equipe' ? 'text-slate-400 hover:text-white' : ''}`}
                     >
                         Mão de Obra (Equipe)
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant={activeTab === 'Despesas' ? 'primary' : 'ghost'}
                         onClick={() => setActiveTab('Despesas')}
-                        className={`px-4 py-2 rounded transition-all ${activeTab === 'Despesas' ? 'bg-primary text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                        className={`transition-all ${activeTab !== 'Despesas' ? 'text-slate-400 hover:text-white' : ''}`}
                     >
                         Despesas Mensais
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -280,15 +298,28 @@ export function FixedCosts() {
                                         </td>
                                         <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
                                         <td className="py-2 text-center">
-                                            <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
+                                            <Button
+                                                variant="danger"
+                                                size="sm"
+                                                onClick={() => handleDeleteCost(cost.id)}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                            >
+                                                <Trash2 size={14} />
+                                            </Button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        <button onClick={() => handleAddCost('Salários CLT', { base_salary: 0 })} className="mt-4 text-xs flex items-center gap-1 text-primary hover:text-white font-medium uppercase tracking-wider">
-                            <Plus size={14} /> Adicionar Funcionário
-                        </button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddCost('Salários CLT', { base_salary: 0 })}
+                            className="mt-4 text-xs text-primary hover:text-white font-medium uppercase tracking-wider"
+                            leftIcon={<Plus size={14} />}
+                        >
+                            Adicionar Funcionário
+                        </Button>
                     </CostSection>
 
                     {/* 2. FREELANCER */}
@@ -336,15 +367,28 @@ export function FixedCosts() {
                                         </td>
                                         <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
                                         <td className="py-2 text-center">
-                                            <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
+                                            <Button
+                                                variant="danger"
+                                                size="sm"
+                                                onClick={() => handleDeleteCost(cost.id)}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                            >
+                                                <Trash2 size={14} />
+                                            </Button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        <button onClick={() => handleAddCost('Salários Freelancer', { daily_rate: 0, qty_people: 1, days_worked: 0 })} className="mt-4 text-xs flex items-center gap-1 text-primary hover:text-white font-medium uppercase tracking-wider">
-                            <Plus size={14} /> Adicionar Freelancer
-                        </button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddCost('Salários Freelancer', { daily_rate: 0, qty_people: 1, days_worked: 0 })}
+                            className="mt-4 text-xs text-primary hover:text-white font-medium uppercase tracking-wider"
+                            leftIcon={<Plus size={14} />}
+                        >
+                            Adicionar Freelancer
+                        </Button>
                     </CostSection>
 
                     {/* 3. MOTOBOYS */}
@@ -392,15 +436,28 @@ export function FixedCosts() {
                                         </td>
                                         <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
                                         <td className="py-2 text-center">
-                                            <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
+                                            <Button
+                                                variant="danger"
+                                                size="sm"
+                                                onClick={() => handleDeleteCost(cost.id)}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                            >
+                                                <Trash2 size={14} />
+                                            </Button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        <button onClick={() => handleAddCost('Motoboys', { daily_rate: 0, qty_people: 1, days_worked: 0 })} className="mt-4 text-xs flex items-center gap-1 text-primary hover:text-white font-medium uppercase tracking-wider">
-                            <Plus size={14} /> Adicionar Motoboy
-                        </button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddCost('Motoboys', { daily_rate: 0, qty_people: 1, days_worked: 0 })}
+                            className="mt-4 text-xs text-primary hover:text-white font-medium uppercase tracking-wider"
+                            leftIcon={<Plus size={14} />}
+                        >
+                            Adicionar Motoboy
+                        </Button>
                     </CostSection>
 
                     {/* 4. LANCHE */}
@@ -484,16 +541,29 @@ export function FixedCosts() {
                                             </td>
                                             <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
                                             <td className="py-2 text-center">
-                                                <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
+                                                <Button
+                                                    variant="danger"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteCost(cost.id)}
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </Button>
                                             </td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                         </table>
-                        <button onClick={() => handleAddCost('Lanche Funcionário', { monthly_qty: 26, unit_cost: 0 })} className="mt-4 text-xs flex items-center gap-1 text-primary hover:text-white font-medium uppercase tracking-wider">
-                            <Plus size={14} /> Adicionar Item de Lanche
-                        </button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddCost('Lanche Funcionário', { monthly_qty: 26, unit_cost: 0 })}
+                            className="mt-4 text-xs text-primary hover:text-white font-medium uppercase tracking-wider"
+                            leftIcon={<Plus size={14} />}
+                        >
+                            Adicionar Item de Lanche
+                        </Button>
                     </CostSection>
                 </div>
             )}
@@ -544,15 +614,28 @@ export function FixedCosts() {
                                             />
                                         </td>
                                         <td className="py-2 text-center">
-                                            <button onClick={() => handleDeleteCost(cost.id)} className="text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
+                                            <Button
+                                                variant="danger"
+                                                size="sm"
+                                                onClick={() => handleDeleteCost(cost.id)}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                            >
+                                                <Trash2 size={14} />
+                                            </Button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        <button onClick={() => handleAddCost('Aluguel & Contas')} className="mt-4 text-xs flex items-center gap-1 text-primary hover:text-white font-medium uppercase tracking-wider">
-                            <Plus size={14} /> Adicionar Nova Despesa
-                        </button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddCost('Aluguel & Contas')}
+                            className="mt-4 text-xs text-primary hover:text-white font-medium uppercase tracking-wider"
+                            leftIcon={<Plus size={14} />}
+                        >
+                            Adicionar Nova Despesa
+                        </Button>
                     </div>
                 </div>
             )}
@@ -583,7 +666,23 @@ function CostSection({ title, icon: Icon, color, isOpen, onToggle, costs, totalV
 
             {isOpen && (
                 <div className="p-4 bg-dark-800/50 animate-in fade-in slide-in-from-top-2 duration-200">
-                    {children}
+                    {costs.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8">
+                            <EmptyState
+                                icon={Icon}
+                                title={`Nenhum custo cadastrado`}
+                                description={`Adicione itens em "${title}" para começar a controlar seus gastos.`}
+                            />
+                            {/* We want to show the specific add button, which is in 'children' usually at the bottom. 
+                                But 'children' contains the table too. 
+                                We should probably just render children as is, but maybe hide table?
+                                Actually, the existing 'children' has a table and a button.
+                            */}
+                            <div className="mt-4">{children}</div>
+                        </div>
+                    ) : (
+                        children
+                    )}
                 </div>
             )}
         </div>
