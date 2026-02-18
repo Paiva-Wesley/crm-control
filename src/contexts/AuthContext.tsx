@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 interface AuthContextType {
     user: User | null;
     session: Session | null;
-    companyId: number | null;
+    companyId: string | null;
     companyName: string | null;
     loading: boolean;
     signOut: () => Promise<void>;
@@ -25,7 +25,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
-    const [companyId, setCompanyId] = useState<number | null>(null);
+    const [companyId, setCompanyId] = useState<string | null>(null);
     const [companyName, setCompanyName] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 

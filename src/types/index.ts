@@ -87,14 +87,14 @@ export interface Fee {
 
 export interface BusinessSettings {
     id: number;
-    company_id?: number;
+    company_id?: string;
     desired_profit_percent: number;
     platform_tax_rate: number;
 }
 
 export interface MonthlyRevenue {
     id: number;
-    company_id: number;
+    company_id: string;
     year: number;
     month: number; // 1-12
     revenue: number;
@@ -102,7 +102,7 @@ export interface MonthlyRevenue {
 
 export interface Sale {
     id: number;
-    company_id: number;
+    company_id: string;
     product_id: number;
     quantity: number;
     sale_price: number;
@@ -124,7 +124,7 @@ export interface Plan {
 
 export interface Subscription {
     id: number;
-    company_id: number;
+    company_id: string;
     plan_id: number;
     status: 'active' | 'past_due' | 'canceled' | 'trialing';
     current_period_start: string;

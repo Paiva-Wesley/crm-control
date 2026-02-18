@@ -9,7 +9,7 @@ interface PlanFeatures {
 
 interface SubscriptionData {
     id: number;
-    company_id: number;
+    company_id: string;
     plan_id: string;
     status: string;
     plan?: {
