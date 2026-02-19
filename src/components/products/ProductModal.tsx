@@ -3,7 +3,9 @@ import { X, Plus, Trash2, Search, Package, Calculator, ImagePlus, Save } from 'l
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import type { Product, Ingredient, BusinessSettings } from '../../types';
+import { useBusinessSettings } from '../../hooks/useBusinessSettings';
+import { computeIdealMenuPrice, computeAllChannelPrices, computeProductMetrics } from '../../lib/pricing';
+import type { Product, Ingredient } from '../../types';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -37,8 +39,8 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
     const [searchTerm, setSearchTerm] = useState('');
     const [showIngredientSearch, setShowIngredientSearch] = useState<number | null>(null);
 
-    // Settings & Calculations
-    const [settings, setSettings] = useState<BusinessSettings | null>(null);
+    // Settings & Calculations (via pricing engine)
+    const biz = useBusinessSettings();
     const [totalCost, setTotalCost] = useState(0);
     const [suggestedPrice, setSuggestedPrice] = useState(0);
 
@@ -52,7 +54,6 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
         if (!isOpen || !companyId) return;
 
         loadIngredients();
-        loadSettings();
 
         if (editingProduct) {
             setName(editingProduct.name);
@@ -77,15 +78,7 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
         setAvailableIngredients(data || []);
     };
 
-    const loadSettings = async () => {
-        const { data } = await supabase
-            .from('business_settings')
-            .select('*')
-            .eq('company_id', companyId)
-            .single();
-
-        if (data) setSettings(data);
-    };
+    // Settings are now loaded via useBusinessSettings hook
 
     const loadProductIngredients = async (productId: number) => {
         const { data } = await supabase
@@ -116,7 +109,7 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
         setActiveTab('data');
     };
 
-    // Calculations
+    // Calculations using centralized pricing engine
     useEffect(() => {
         const cost = ingredientLines.reduce((acc, line) => {
             const ingredient = availableIngredients.find(i => i.id === line.ingredient_id);
@@ -125,14 +118,10 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
 
         setTotalCost(cost);
 
-        const desiredMargin = settings?.desired_profit_percent || 30;
-        const platformTax = settings?.platform_tax_rate || 0;
-        const totalTaxes = platformTax + 5;
-        const divisor = 1 - ((desiredMargin + totalTaxes) / 100);
-        const suggested = divisor > 0 ? cost / divisor : cost * 3;
-
+        // Preço Sugerido = CMV × Markup (via pricing engine)
+        const suggested = computeIdealMenuPrice(cost, biz.markup);
         setSuggestedPrice(suggested);
-    }, [ingredientLines, availableIngredients, settings]);
+    }, [ingredientLines, availableIngredients, biz.markup]);
 
     // Ingredient handlers
     const addIngredientLine = () => {
@@ -287,11 +276,6 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
         i.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Margin calculation
-    const currentPrice = Number(salePrice) || 0;
-    const grossProfit = currentPrice - totalCost;
-    const marginPercent = currentPrice > 0 ? (grossProfit / currentPrice) * 100 : 0;
-    const markup = totalCost > 0 ? currentPrice / totalCost : 0;
 
     if (!isOpen) return null;
 
@@ -605,7 +589,7 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                                         R$ {suggestedPrice.toFixed(2)}
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1">
-                                        Baseado em {settings?.desired_profit_percent || 30}% de margem desejada
+                                        Markup: {biz.markup > 0 ? biz.markup.toFixed(2) + 'x' : 'N/A'} (CMV × Markup)
                                     </p>
                                     <button
                                         onClick={() => setSalePrice(suggestedPrice.toFixed(2))}
@@ -616,53 +600,109 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                                 </div>
                             </div>
 
-                            {/* Analysis Cards */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
-                                    <p className="text-sm text-slate-400 mb-1">Custo Total</p>
-                                    <p className="text-lg font-semibold text-white">
-                                        R$ {totalCost.toFixed(2)}
-                                    </p>
-                                </div>
+                            {/* Analysis Cards — using pricing engine */}
+                            {(() => {
+                                const currentPrice = parseFloat(salePrice) || 0;
+                                const m = computeProductMetrics({
+                                    cmv: totalCost,
+                                    salePrice: currentPrice,
+                                    fixedCostPercent: biz.fixedCostPercent,
+                                    variableCostPercent: biz.variableCostPercent,
+                                    desiredProfitPercent: biz.desiredProfitPercent,
+                                    totalFixedCosts: biz.totalFixedCosts,
+                                    estimatedMonthlySales: biz.estimatedMonthlySales,
+                                    averageMonthlyRevenue: biz.averageMonthlyRevenue,
+                                    channels: biz.channels,
+                                    fixedCostAllocationMode: biz.fixedCostAllocationMode,
+                                    targetCmvPercent: biz.targetCmvPercent,
+                                });
+                                const cmvColor = m.cmvStatus === 'danger' ? 'text-red-400' : m.cmvStatus === 'warning' ? 'text-amber-400' : 'text-emerald-400';
+                                const profitColor = m.marginStatus === 'danger' ? 'text-red-400' : m.marginStatus === 'warning' ? 'text-amber-400' : 'text-emerald-400';
 
-                                <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
-                                    <p className="text-sm text-slate-400 mb-1">Lucro Bruto</p>
-                                    <p className={`text-lg font-semibold ${grossProfit >= 0 ? 'text-emerald-400' : 'text-red-400'
-                                        }`}>
-                                        R$ {grossProfit.toFixed(2)}
-                                    </p>
-                                </div>
+                                return (
+                                    <>
+                                        {/* CMV + Margins grid */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div className={`bg-dark-900 p-4 rounded-lg border ${m.cmvStatus === 'danger' ? 'border-red-500/40' : m.cmvStatus === 'warning' ? 'border-amber-500/40' : 'border-dark-700'}`}>
+                                                <p className="text-sm text-slate-400 mb-1">CMV %</p>
+                                                <p className={`text-lg font-semibold ${cmvColor}`}>
+                                                    {m.cmvPercent.toFixed(1)}% {m.cmvStatus === 'healthy' ? '🟢' : m.cmvStatus === 'warning' ? '🟡' : '🔴'}
+                                                </p>
+                                                <p className="text-[10px] text-slate-600">meta ≤ {biz.targetCmvPercent}%</p>
+                                            </div>
 
-                                <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
-                                    <p className="text-sm text-slate-400 mb-1">Margem</p>
-                                    <p className={`text-lg font-semibold ${marginPercent >= 30 ? 'text-emerald-400' :
-                                        marginPercent > 0 ? 'text-yellow-400' : 'text-red-400'
-                                        }`}>
-                                        {marginPercent.toFixed(1)}%
-                                    </p>
-                                </div>
+                                            <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
+                                                <p className="text-sm text-slate-400 mb-1">Margem Bruta</p>
+                                                <p className="text-lg font-semibold text-white">
+                                                    {m.grossMarginPercent.toFixed(1)}%
+                                                </p>
+                                                <p className="text-[10px] text-slate-600">antes custos op.</p>
+                                            </div>
 
-                                <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
-                                    <p className="text-sm text-slate-400 mb-1">Markup</p>
-                                    <p className="text-lg font-semibold text-blue-400">
-                                        {markup.toFixed(2)}x
-                                    </p>
-                                </div>
-                            </div>
+                                            <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
+                                                <p className="text-sm text-slate-400 mb-1">Margem Contribuição</p>
+                                                <p className="text-lg font-semibold text-white">
+                                                    {m.contributionMarginPercent.toFixed(1)}%
+                                                </p>
+                                                <p className="text-[10px] text-slate-600">após custos var.</p>
+                                            </div>
 
-                            {/* Alert */}
-                            {marginPercent < 20 && currentPrice > 0 && (
-                                <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                                    <Calculator className="text-yellow-400 shrink-0" size={20} />
-                                    <div>
-                                        <p className="text-yellow-400 font-medium">Atenção: Margem baixa</p>
-                                        <p className="text-sm text-yellow-400/80 mt-1">
-                                            A margem de {marginPercent.toFixed(1)}% está abaixo do recomendado (30%+).
-                                            Considere aumentar o preço ou reduzir custos.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+                                            <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
+                                                <p className="text-sm text-slate-400 mb-1">Lucro Estimado</p>
+                                                <p className={`text-lg font-semibold ${profitColor}`}>
+                                                    R$ {m.profitValue.toFixed(2)} ({m.profitPercent.toFixed(1)}%)
+                                                </p>
+                                                <p className="text-[10px] text-slate-600">
+                                                    Custo fixo: {m.fixedCostMethod === 'revenue_based' ? 'faturamento' : 'por unidade'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Alert */}
+                                        {m.marginStatus === 'warning' && currentPrice > 0 && (
+                                            <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                                                <Calculator className="text-yellow-400 shrink-0" size={20} />
+                                                <div>
+                                                    <p className="text-yellow-400 font-medium">Atenção: Lucro abaixo do desejado</p>
+                                                    <p className="text-sm text-yellow-400/80 mt-1">
+                                                        Lucro de {m.profitPercent.toFixed(1)}% está abaixo do desejado ({biz.desiredProfitPercent}%).
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {m.marginStatus === 'danger' && currentPrice > 0 && (
+                                            <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                                                <Calculator className="text-red-400 shrink-0" size={20} />
+                                                <div>
+                                                    <p className="text-red-400 font-medium">⚠️ Produto com PREJUÍZO</p>
+                                                    <p className="text-sm text-red-400/80 mt-1">
+                                                        Revise o preço de venda ou reduza custos.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Per-Channel Ideal Prices */}
+                                        {biz.channels.length > 0 && suggestedPrice > 0 && (
+                                            <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
+                                                <p className="text-sm text-blue-400 font-medium mb-3">Preço Ideal por Canal</p>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-emerald-400">Cardápio Próprio</span>
+                                                        <span className="font-bold text-emerald-400">R$ {suggestedPrice.toFixed(2)}</span>
+                                                    </div>
+                                                    {computeAllChannelPrices(suggestedPrice, biz.channels).map(cp => (
+                                                        <div key={cp.channelId} className="flex justify-between text-sm">
+                                                            <span className="text-slate-300">{cp.channelName} <span className="text-xs text-slate-500">({cp.totalTaxRate.toFixed(1)}%)</span></span>
+                                                            <span className="font-bold text-blue-400">R$ {cp.idealPrice.toFixed(2)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                     )}
                 </div>

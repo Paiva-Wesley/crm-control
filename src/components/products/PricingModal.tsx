@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
 import { Modal } from '../ui/Modal';
+import { useBusinessSettings } from '../../hooks/useBusinessSettings';
+import { computeProductMetrics, type ProductMetrics } from '../../lib/pricing';
 
 interface PricingModalProps {
     isOpen: boolean;
@@ -11,87 +12,49 @@ interface PricingModalProps {
     productSalesQty?: number;
 }
 
-export function PricingModal({ isOpen, onClose, productName, cmv, currentSalePrice, productSalesQty }: PricingModalProps) {
+const cmvIcon = (status: string) =>
+    status === 'healthy' ? '🟢' : status === 'warning' ? '🟡' : '🔴';
+const marginIcon = (status: string) =>
+    status === 'healthy' ? '🟢' : status === 'warning' ? '🟡' : '🔴';
+
+export function PricingModal({ isOpen, onClose, productName, cmv, currentSalePrice }: PricingModalProps) {
+    const biz = useBusinessSettings();
     const [salePrice, setSalePrice] = useState(currentSalePrice);
-    const [taxRate, setTaxRate] = useState(0); // %
-    const [fixedCostType, setFixedCostType] = useState<'percent' | 'value'>('percent');
-
-    // For manual entry
-    const [fixedCostInput, setFixedCostInput] = useState(0);
-
-    // For "Advanced" Fixed Cost estimation
-    const [totalMonthlyFixedCosts, setTotalMonthlyFixedCosts] = useState(0);
-    const [estimatedMonthlySales, setEstimatedMonthlySales] = useState(productSalesQty || 1000); // Default or Real
-    const [showAdvancedFixedCost, setShowAdvancedFixedCost] = useState(!!productSalesQty); // Auto-show if we have real data
 
     useEffect(() => {
         if (isOpen) {
             setSalePrice(currentSalePrice);
-            fetchFixedCosts();
-            fetchFees();
         }
     }, [isOpen, currentSalePrice]);
 
-    async function fetchFixedCosts() {
-        try {
-            const { data, error } = await supabase.from('fixed_costs').select('monthly_value');
-            if (error) throw error;
-            const total = data?.reduce((acc, curr) => acc + curr.monthly_value, 0) || 0;
-            setTotalMonthlyFixedCosts(total);
-        } catch (err) {
-            console.error('Error fetching fixed costs', err);
-        }
-    }
+    // Compute metrics using the pricing engine
+    const metrics: ProductMetrics = computeProductMetrics({
+        cmv,
+        salePrice,
+        fixedCostPercent: biz.fixedCostPercent,
+        variableCostPercent: biz.variableCostPercent,
+        desiredProfitPercent: biz.desiredProfitPercent,
+        totalFixedCosts: biz.totalFixedCosts,
+        estimatedMonthlySales: biz.estimatedMonthlySales,
+        averageMonthlyRevenue: biz.averageMonthlyRevenue,
+        channels: biz.channels,
+        fixedCostAllocationMode: biz.fixedCostAllocationMode,
+        targetCmvPercent: biz.targetCmvPercent,
+    });
 
-    async function fetchFees() {
-        try {
-            const { data, error } = await supabase.from('fees').select('percentage');
-            if (error) throw error;
-            const totalFees = data?.reduce((acc, curr) => acc + curr.percentage, 0) || 0;
-            // Only set taxRate if it's currently 0 to allow manual override, 
-            // but here we prefer to load the config first.
-            setTaxRate(totalFees);
-        } catch (err) {
-            console.error('Error fetching fees', err);
-        }
-    }
-
-    // Calculations
-    const variableCostValue = salePrice * (taxRate / 100);
-
-    let fixedCostValue = 0;
-    let fixedCostPercent = 0;
-
-    if (showAdvancedFixedCost) {
-        // Calculate based on total monthly costs / quantity
-        // This gives a per-unit cost
-        fixedCostValue = estimatedMonthlySales > 0 ? totalMonthlyFixedCosts / estimatedMonthlySales : 0;
-        fixedCostPercent = salePrice > 0 ? (fixedCostValue / salePrice) * 100 : 0;
-    } else {
-        // Manual input
-        if (fixedCostType === 'percent') {
-            fixedCostPercent = fixedCostInput;
-            fixedCostValue = salePrice * (fixedCostInput / 100);
-        } else {
-            fixedCostValue = fixedCostInput;
-            fixedCostPercent = salePrice > 0 ? (fixedCostInput / salePrice) * 100 : 0;
-        }
-    }
-
-    const cmvPercent = salePrice > 0 ? (cmv / salePrice) * 100 : 0;
-
-    const totalCosts = cmv + variableCostValue + fixedCostValue;
-    const profit = salePrice - totalCosts;
-    const profitPercent = salePrice > 0 ? (profit / salePrice) * 100 : 0;
-
-    const suggestedPrice = cmv * 3; // Basic markup rule of thumb often used
+    const profitColor = metrics.marginStatus === 'danger'
+        ? 'text-red-400' : metrics.marginStatus === 'warning'
+            ? 'text-amber-400' : 'text-emerald-400';
+    const profitBg = metrics.marginStatus === 'danger'
+        ? 'bg-red-500/10' : metrics.marginStatus === 'warning'
+            ? 'bg-amber-500/10' : 'bg-emerald-500/10';
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Resumo Precificação: ${productName}`} maxWidth="800px">
-            <div className="flex flex-col gap-6">
+        <Modal isOpen={isOpen} onClose={onClose} title={`Precificação: ${productName}`} maxWidth="800px">
+            <div className="flex flex-col gap-5">
 
-                {/* Configuration Inputs */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-secondary/10 p-4 rounded-lg border border-color">
+                {/* Price Input */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm text-secondary mb-1">Preço de Venda (Simulação)</label>
                         <div className="relative">
@@ -105,121 +68,147 @@ export function PricingModal({ isOpen, onClose, productName, cmv, currentSalePri
                             />
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-sm text-secondary mb-1">Impostos / Taxas Variáveis (%)</label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            className="w-full"
-                            value={taxRate}
-                            onChange={e => setTaxRate(Number(e.target.value))}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-secondary mb-1 flex justify-between">
-                            <span>Custos Fixos</span>
-                            <button
-                                className="text-xs text-accent-primary underline"
-                                onClick={() => setShowAdvancedFixedCost(!showAdvancedFixedCost)}
-                            >
-                                {showAdvancedFixedCost ? 'Usar Manual' : 'Usar Auto'}
-                            </button>
-                        </label>
-
-                        {showAdvancedFixedCost ? (
-                            <div className="flex flex-col gap-1">
-                                <span className="text-xs text-secondary">Total Fixo: R$ {totalMonthlyFixedCosts.toFixed(2)}</span>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="number"
-                                        className="w-full text-sm"
-                                        placeholder="Qtd Vendas/Mês"
-                                        value={estimatedMonthlySales}
-                                        onChange={e => setEstimatedMonthlySales(Number(e.target.value))}
-                                        title="Quantidade estimada de vendas mensais para rateio"
-                                    />
-                                    <span className="text-xs whitespace-nowrap">vendas/mês</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex gap-2">
-                                <select
-                                    className="w-24 px-1"
-                                    value={fixedCostType}
-                                    onChange={e => setFixedCostType(e.target.value as any)}
-                                >
-                                    <option value="percent">%</option>
-                                    <option value="value">R$</option>
-                                </select>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    className="w-full"
-                                    value={fixedCostInput}
-                                    onChange={e => setFixedCostInput(Number(e.target.value))}
-                                />
-                            </div>
-                        )}
+                    <div className="bg-emerald-500/5 p-4 rounded-lg border border-emerald-500/20">
+                        <p className="text-sm text-slate-400 mb-1">Preço Ideal Cardápio</p>
+                        <p className="text-2xl font-bold text-emerald-400">
+                            R$ {metrics.idealMenuPrice.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Markup: {metrics.markup > 0 ? metrics.markup.toFixed(2) + 'x' : 'N/A'} (CMV × Markup)
+                        </p>
                     </div>
                 </div>
 
-                {/* Summary Table */}
+                {/* ====== INDICADORES DE DECISÃO ====== */}
                 <div className="border border-color rounded-lg overflow-hidden">
-                    <div className="bg-accent-primary p-2 font-bold text-center uppercase text-sm">Resumo da Precificação</div>
-                    <div className="grid grid-cols-2 divide-x divide-color border-b border-color">
+                    <div className="bg-blue-500/10 p-2 font-bold text-center uppercase text-sm text-blue-400">
+                        📊 Indicadores de Decisão
+                    </div>
 
-                        {/* Costs Column */}
-                        <div className="p-0">
-                            <div className="flex justify-between p-2 border-b border-color/50">
-                                <span>Custo de Produtos (CMV) (R$)</span>
-                                <span className="font-bold">R$ {cmv.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between p-2 border-b border-color/50">
-                                <span>Custo de Produtos (CMV) (%)</span>
-                                <span className="font-bold">{cmvPercent.toFixed(2)}%</span>
-                            </div>
-                            <div className="flex justify-between p-2 border-b border-color/50">
-                                <span>Custos Variáveis / Impostos (R$)</span>
-                                <span>R$ {variableCostValue.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between p-2 border-b border-color/50">
-                                <span>Custo Fixo (R$) <span className="text-xs text-secondary">({fixedCostPercent.toFixed(1)}%)</span></span>
-                                <span>R$ {fixedCostValue.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between p-2 bg-secondary/20 font-bold">
-                                <span>Custo Total Unitário</span>
-                                <span>R$ {totalCosts.toFixed(2)}</span>
-                            </div>
+                    {/* CMV Indicator — top block, prominent */}
+                    <div className={`grid grid-cols-3 divide-x divide-color border-b border-color ${metrics.cmvStatus === 'danger' ? 'bg-red-500/5' :
+                        metrics.cmvStatus === 'warning' ? 'bg-amber-500/5' :
+                            'bg-emerald-500/5'
+                        }`}>
+                        <div className="p-3 text-center">
+                            <p className="text-xs text-slate-500 uppercase">CMV (R$)</p>
+                            <p className="text-lg font-bold text-white">R$ {cmv.toFixed(2)}</p>
                         </div>
+                        <div className="p-3 text-center">
+                            <p className="text-xs text-slate-500 uppercase">CMV (%)</p>
+                            <p className={`text-lg font-bold ${metrics.cmvStatus === 'danger' ? 'text-red-400' :
+                                metrics.cmvStatus === 'warning' ? 'text-amber-400' :
+                                    'text-emerald-400'
+                                }`}>
+                                {metrics.cmvPercent.toFixed(1)}% {cmvIcon(metrics.cmvStatus)}
+                            </p>
+                        </div>
+                        <div className="p-3 text-center">
+                            <p className="text-xs text-slate-500 uppercase">Meta CMV</p>
+                            <p className="text-lg font-bold text-slate-300">≤ {biz.targetCmvPercent}%</p>
+                        </div>
+                    </div>
 
-                        {/* Result Column */}
-                        <div className="p-0">
-                            <div className="flex justify-between p-2 border-b border-color/50 bg-yellow-500/10">
-                                <span>Preço Atual de Venda</span>
-                                <span className="font-bold text-lg">R$ {salePrice.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between p-2 border-b border-color/50">
-                                <span>Lucro Estimado (R$)</span>
-                                <span className={`font-bold ${profit > 0 ? 'text-success' : 'text-danger'}`}>
-                                    R$ {profit.toFixed(2)}
+                    {/* Margins grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-color border-b border-color">
+                        <div className="p-3 text-center">
+                            <p className="text-xs text-slate-500 uppercase">Margem Bruta</p>
+                            <p className="text-lg font-bold text-white">{metrics.grossMarginPercent.toFixed(1)}%</p>
+                            <p className="text-[10px] text-slate-600">antes de custos op.</p>
+                        </div>
+                        <div className="p-3 text-center">
+                            <p className="text-xs text-slate-500 uppercase">Margem Contribuição</p>
+                            <p className="text-lg font-bold text-white">{metrics.contributionMarginPercent.toFixed(1)}%</p>
+                            <p className="text-[10px] text-slate-600">após custos variáveis</p>
+                        </div>
+                        <div className={`p-3 text-center ${profitBg}`}>
+                            <p className="text-xs text-slate-500 uppercase">Lucro Estimado</p>
+                            <p className={`text-lg font-bold ${profitColor}`}>
+                                R$ {metrics.profitValue.toFixed(2)}
+                            </p>
+                        </div>
+                        <div className={`p-3 text-center ${profitBg}`}>
+                            <p className="text-xs text-slate-500 uppercase">Lucro (%)</p>
+                            <p className={`text-lg font-bold ${profitColor}`}>
+                                {metrics.profitPercent.toFixed(1)}% {marginIcon(metrics.marginStatus)}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Cost breakdown */}
+                    <div className="divide-y divide-color/50 text-sm">
+                        <div className="flex justify-between p-2">
+                            <span>Custo de Produtos (CMV)</span>
+                            <span className="font-medium">R$ {cmv.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                            <span>Custos Variáveis ({biz.variableCostPercent.toFixed(1)}%)</span>
+                            <span>R$ {metrics.variableCostValue.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                            <span className="flex items-center gap-1">
+                                Custo Fixo
+                                <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded">
+                                    {metrics.fixedCostMethod === 'revenue_based' ? 'Faturamento' : 'Por Unidade'}
                                 </span>
-                            </div>
-                            <div className="flex justify-between p-2 border-b border-color/50">
-                                <span>Lucro (%)</span>
-                                <span className={`font-bold ${profitPercent > 20 ? 'text-success' : profitPercent > 10 ? 'text-warning' : 'text-danger'}`}>
-                                    {profitPercent.toFixed(2)}%
-                                </span>
-                            </div>
-                            <div className="flex justify-between p-2 border-b border-color/50 text-secondary text-sm">
-                                <span>Sugestão (CMV x 3)</span>
-                                <span>R$ {suggestedPrice.toFixed(2)}</span>
-                            </div>
+                            </span>
+                            <span>R$ {metrics.fixedCostValue.toFixed(2)}</span>
+                        </div>
+                        <div className="px-2 py-1 text-[10px] text-slate-500 italic">
+                            Baseado em {metrics.fixedCostExplanation}
+                        </div>
+                        <div className="flex justify-between p-2 bg-secondary/20 font-bold">
+                            <span>Custo Total Unitário</span>
+                            <span>R$ {metrics.totalCost.toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="text-center text-sm text-secondary">
-                    * O Custo Fixo é calculado com base na estimativa de vendas ou percentual manual.
+                {/* Alerts */}
+                {metrics.marginStatus === 'warning' && (
+                    <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-sm">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                        Lucro de {metrics.profitPercent.toFixed(1)}% está abaixo do desejado ({biz.desiredProfitPercent}%)
+                    </div>
+                )}
+                {metrics.marginStatus === 'danger' && (
+                    <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                        <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0" />
+                        ⚠️ Produto com PREJUÍZO — revise preço ou custos
+                    </div>
+                )}
+
+                {/* Per-Channel Ideal Prices */}
+                {metrics.channelPrices.length > 0 && (
+                    <div className="border border-color rounded-lg overflow-hidden">
+                        <div className="bg-blue-500/10 p-2 font-bold text-center uppercase text-sm text-blue-400">
+                            Preço Ideal por Canal de Venda
+                        </div>
+                        <div className="divide-y divide-color">
+                            {metrics.channelPrices.map(cp => (
+                                <div key={cp.channelId} className="flex justify-between items-center p-3 hover:bg-dark-700/30 transition-colors">
+                                    <div>
+                                        <span className="font-medium text-slate-200">{cp.channelName}</span>
+                                        <span className="text-xs text-slate-500 ml-2">({cp.totalTaxRate.toFixed(1)}% taxas)</span>
+                                    </div>
+                                    <span className="font-bold text-blue-400 text-lg">
+                                        R$ {cp.idealPrice.toFixed(2)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Footer info */}
+                <div className="flex items-center justify-between text-sm text-secondary bg-secondary/5 p-3 rounded-lg">
+                    <span>Markup: <strong className="text-white">{metrics.markup.toFixed(2)}x</strong></span>
+                    <span>Lucro Desejado: <strong className="text-emerald-400">{biz.desiredProfitPercent}%</strong></span>
+                    <span>Meta CMV: <strong className="text-blue-400">≤ {biz.targetCmvPercent}%</strong></span>
+                </div>
+
+                <div className="text-center text-xs text-secondary">
+                    * Custos e markup calculados automaticamente com base nos Dados do Negócio.
                 </div>
 
                 <div className="flex justify-end">

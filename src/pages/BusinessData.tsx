@@ -57,6 +57,9 @@ export function BusinessData() {
                     id: 0,
                     desired_profit_percent: 15,
                     platform_tax_rate: 18,
+                    estimated_monthly_sales: 1000,
+                    fixed_cost_allocation_mode: 'revenue_based',
+                    target_cmv_percent: 35,
                     monthly_revenue: revenueMap // Use default map
                 } as any);
             }
@@ -83,11 +86,17 @@ export function BusinessData() {
                 await supabase.from('business_settings').update({
                     desired_profit_percent: settings.desired_profit_percent,
                     platform_tax_rate: settings.platform_tax_rate,
+                    estimated_monthly_sales: settings.estimated_monthly_sales ?? 1000,
+                    fixed_cost_allocation_mode: settings.fixed_cost_allocation_mode ?? 'revenue_based',
+                    target_cmv_percent: settings.target_cmv_percent ?? 35,
                 }).eq('id', data.id);
             } else {
                 await supabase.from('business_settings').insert({
                     desired_profit_percent: settings.desired_profit_percent,
                     platform_tax_rate: settings.platform_tax_rate,
+                    estimated_monthly_sales: settings.estimated_monthly_sales ?? 1000,
+                    fixed_cost_allocation_mode: settings.fixed_cost_allocation_mode ?? 'revenue_based',
+                    target_cmv_percent: settings.target_cmv_percent ?? 35,
                     company_id: companyId
                 });
             }
@@ -232,6 +241,45 @@ export function BusinessData() {
                                     value={settings.platform_tax_rate}
                                     onChange={e => setSettings({ ...settings, platform_tax_rate: parseFloat(e.target.value) })}
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-slate-400 mb-1">Qtd Vendas Estimada / Mês</label>
+                                <input
+                                    type="number"
+                                    className="input w-full bg-dark-900 border border-dark-600 rounded p-2 text-white"
+                                    value={settings.estimated_monthly_sales ?? 1000}
+                                    onChange={e => setSettings({ ...settings, estimated_monthly_sales: parseFloat(e.target.value) })}
+                                    placeholder="1000"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Usado para rateio de custos fixos por unidade vendida</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-slate-400 mb-1">Meta CMV (%)</label>
+                                <input
+                                    type="number"
+                                    step="1"
+                                    className="input w-full bg-dark-900 border border-dark-600 rounded p-2 text-white"
+                                    value={settings.target_cmv_percent ?? 35}
+                                    onChange={e => setSettings({ ...settings, target_cmv_percent: parseFloat(e.target.value) })}
+                                    placeholder="35"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Alvo máximo de CMV (padrão 35%)</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-slate-400 mb-1">Modo Rateio Custo Fixo</label>
+                                <select
+                                    className="input w-full bg-dark-900 border border-dark-600 rounded p-2 text-white"
+                                    value={settings.fixed_cost_allocation_mode ?? 'revenue_based'}
+                                    onChange={e => setSettings({ ...settings, fixed_cost_allocation_mode: e.target.value as any })}
+                                >
+                                    <option value="revenue_based">% do Faturamento Médio</option>
+                                    <option value="per_unit">Vendas Estimadas / Mês</option>
+                                </select>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    {(settings.fixed_cost_allocation_mode ?? 'revenue_based') === 'revenue_based'
+                                        ? 'Custo fixo = preço × (custos fixos / faturamento médio)'
+                                        : 'Custo fixo = total fixo mensal ÷ vendas estimadas'}
+                                </p>
                             </div>
                         </div>
                     </div>

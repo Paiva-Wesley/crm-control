@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
+import { Plus, Search, Trash2, Package } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { ProductWithCost } from '../types';
 import { ProductModal } from '../components/products/ProductModal';
 import { useSubscription } from '../hooks/useSubscription';
+import { useBusinessSettings } from '../hooks/useBusinessSettings';
+import { computeProductMetrics } from '../lib/pricing';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../contexts/ToastContext';
@@ -16,6 +18,7 @@ export function Products() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<ProductWithCost | null>(null);
     const { toast } = useToast();
+    const biz = useBusinessSettings();
 
     useEffect(() => {
         fetchProducts();
@@ -127,8 +130,8 @@ export function Products() {
                                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Categoria</th>
                                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Preço Venda</th>
                                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">CMV</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Margem R$</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Margem %</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">CMV %</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Lucro Estimado</th>
                                     <th className="px-4 py-3 text-right text-sm font-medium text-slate-400 uppercase tracking-wider">Ações</th>
                                 </tr>
                             </thead>
@@ -139,42 +142,61 @@ export function Products() {
                                     filteredProducts.map(prod => (
                                         <tr
                                             key={prod.id}
-                                            className="border-b border-dark-700 hover:bg-dark-700/50 transition-colors"
+                                            className="border-b border-dark-700 hover:bg-dark-700/50 transition-colors cursor-pointer"
                                             style={{ opacity: prod.active ? 1 : 0.5 }}
+                                            onClick={() => handleEdit(prod)}
                                         >
                                             <td className="px-4 py-4 font-semibold text-slate-100">{prod.name}</td>
                                             <td className="px-4 py-4 text-slate-300">{prod.category || '-'}</td>
                                             <td className="px-4 py-4 text-slate-300">R$ {Number(prod.sale_price).toFixed(2)}</td>
                                             <td className="px-4 py-4 text-slate-400">R$ {Number(prod.cmv).toFixed(2)}</td>
-                                            <td className={`px-4 py-4 ${prod.gross_profit > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                R$ {Number(prod.gross_profit).toFixed(2)}
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <span className={`
-                                                    inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
-                                                    ${prod.margin_percent > 30
-                                                        ? 'bg-emerald-500/10 text-emerald-400'
-                                                        : 'bg-red-500/10 text-red-400'
-                                                    }
-                                                `}>
-                                                    {Number(prod.margin_percent).toFixed(1)}%
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleEdit(prod)}
-                                                    className="h-8 w-8 p-0"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 size={18} />
-                                                </Button>
+                                            {/* CMV % and Lucro Estimado via pricing engine */}
+                                            {(() => {
+                                                const price = Number(prod.sale_price) || 0;
+                                                const cmv = Number(prod.cmv) || 0;
+                                                const cmvPct = price > 0 ? (cmv / price) * 100 : 0;
+
+                                                const m = computeProductMetrics({
+                                                    cmv,
+                                                    salePrice: price,
+                                                    fixedCostPercent: biz.fixedCostPercent,
+                                                    variableCostPercent: biz.variableCostPercent,
+                                                    desiredProfitPercent: biz.desiredProfitPercent,
+                                                    totalFixedCosts: biz.totalFixedCosts,
+                                                    estimatedMonthlySales: biz.estimatedMonthlySales,
+                                                    averageMonthlyRevenue: biz.averageMonthlyRevenue,
+                                                    channels: biz.channels,
+                                                    fixedCostAllocationMode: biz.fixedCostAllocationMode,
+                                                    targetCmvPercent: biz.targetCmvPercent,
+                                                });
+
+                                                const cmvColor = cmvPct <= (biz.targetCmvPercent ?? 35) ? 'text-emerald-400' : cmvPct <= (biz.targetCmvPercent ?? 35) + 5 ? 'text-amber-400' : 'text-red-400';
+                                                const cmvBg = cmvPct <= (biz.targetCmvPercent ?? 35) ? 'bg-emerald-500/10' : cmvPct <= (biz.targetCmvPercent ?? 35) + 5 ? 'bg-amber-500/10' : 'bg-red-500/10';
+                                                const profitColor = m.profitValue > 0 ? 'text-emerald-400' : 'text-red-400';
+                                                return (
+                                                    <>
+                                                        <td className="px-4 py-4">
+                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${cmvBg} ${cmvColor}`}>
+                                                                {cmvPct.toFixed(1)}%
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <span className={`font-semibold ${profitColor}`}>
+                                                                R$ {m.profitValue.toFixed(2)}
+                                                            </span>
+                                                            <span className={`block text-xs mt-0.5 ${profitColor} opacity-70`}>
+                                                                {m.profitPercent.toFixed(1)}%
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                );
+                                            })()}
+                                            <td className="px-4 py-4 text-right" onClick={e => e.stopPropagation()}>
                                                 <Button
                                                     variant="danger"
                                                     size="sm"
                                                     onClick={() => handleDelete(prod.id)}
-                                                    className="h-8 w-8 p-0 ml-1"
+                                                    className="h-8 w-8 p-0"
                                                     title="Excluir"
                                                 >
                                                     <Trash2 size={18} />

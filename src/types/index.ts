@@ -100,6 +100,9 @@ export interface BusinessSettings {
     company_id?: string;
     desired_profit_percent: number;
     platform_tax_rate: number;
+    estimated_monthly_sales: number;
+    fixed_cost_allocation_mode: 'revenue_based' | 'per_unit';
+    target_cmv_percent: number;
 }
 
 export interface MonthlyRevenue {

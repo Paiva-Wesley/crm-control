@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 import { DollarSign, Search, AlertCircle, TrendingUp, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Product, BusinessSettings } from '../types';
+import type { Product } from '../types';
 import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
+import { useBusinessSettings } from '../hooks/useBusinessSettings';
+import { computeIdealMenuPrice, computeAllChannelPrices } from '../lib/pricing';
 
 export function ResaleProducts() {
     const { companyId } = useAuth();
     const [loading, setLoading] = useState(true);
     const [products, setProducts] = useState<Product[]>([]);
     const [productCosts, setProductCosts] = useState<Record<number, number>>({});
-    const [settings, setSettings] = useState<BusinessSettings | null>(null);
+    const biz = useBusinessSettings();
 
-    // Global Parameters
-    const [fixedCostPercent, setFixedCostPercent] = useState(0);
-    const [variableRateTotal, setVariableRateTotal] = useState(0);
+    // UI
     const [searchTerm, setSearchTerm] = useState('');
 
     // Modal State
@@ -31,32 +31,7 @@ export function ResaleProducts() {
         try {
             setLoading(true);
 
-            // 1. Fetch Business Settings & Costs
-            const { data: settingsData } = await supabase.from('business_settings').select('*').eq('company_id', companyId).limit(1).maybeSingle();
-            const { data: costs } = await supabase.from('fixed_costs').select('monthly_value').eq('company_id', companyId);
-            const { data: fees } = await supabase.from('fees').select('percentage');
-            // Fetch revenue from new table
-            const { data: revenueData } = await supabase.from('monthly_revenue').select('revenue').eq('company_id', companyId);
-
-            let revenue = 33000;
-            if (revenueData && revenueData.length > 0) {
-                const totalRev = revenueData.reduce((acc, curr) => acc + Number(curr.revenue), 0);
-                revenue = totalRev / 12 || 33000;
-            }
-
-            if (settingsData) {
-                setSettings(settingsData);
-            }
-
-            const totalFixed = (costs || []).reduce((acc, curr) => acc + Number(curr.monthly_value), 0);
-            const totalFees = (fees || []).reduce((acc, curr) => acc + Number(curr.percentage), 0);
-
-            const fixedPercent = revenue > 0 ? (totalFixed / revenue) * 100 : 0;
-
-            setFixedCostPercent(fixedPercent);
-            setVariableRateTotal(totalFees);
-
-            // 2. Fetch Products
+            // Fetch Products (Beverages)
             const { data: prods } = await supabase
                 .from('products')
                 .select('*')
@@ -201,10 +176,8 @@ export function ResaleProducts() {
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const platformTax = settings?.platform_tax_rate || 18;
-    const desiredProfit = settings?.desired_profit_percent || 15;
-    const totalBurdenPercent = fixedCostPercent + variableRateTotal + platformTax + desiredProfit;
-    const itemMarkup = totalBurdenPercent < 100 ? (1 / (1 - (totalBurdenPercent / 100))) : 0;
+    // Markup from pricing engine (no platformTax baked in)
+    const itemMarkup = biz.markup;
 
     if (loading) return <div className="p-8 text-center text-slate-400">Carregando...</div>;
 
@@ -253,7 +226,10 @@ export function ResaleProducts() {
                                     <th className="px-2 py-3 text-right font-bold">Lucro %</th>
                                     <th className="px-2 py-3 text-right text-slate-400 border-l border-dark-700">Preço Médio</th>
                                     <th className="px-2 py-3 text-right text-blue-400 bg-blue-900/10 border-l border-dark-700">Preço Tabela</th>
-                                    <th className="px-2 py-3 text-right text-amber-400 bg-amber-900/10 border-l border-dark-700">Ideal iFood</th>
+                                    <th className="px-2 py-3 text-right text-emerald-400 bg-emerald-900/10 border-l border-dark-700">Ideal Cardápio</th>
+                                    {biz.channels.map(ch => (
+                                        <th key={ch.id} className="px-2 py-3 text-right text-amber-400 bg-amber-900/10 border-l border-dark-700 text-xs">Ideal {ch.name}</th>
+                                    ))}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-700">
@@ -271,14 +247,14 @@ export function ResaleProducts() {
                                         // Calculations
                                         const cmvPercent = price > 0 ? (cost / price) * 100 : 0;
 
-                                        const fixedVal = price * (fixedCostPercent / 100);
-                                        const varVal = price * (variableRateTotal / 100);
-                                        const taxVal = price * (platformTax / 100);
-                                        const totalDeductions = cost + fixedVal + varVal + taxVal;
+                                        const fixedVal = price * (biz.fixedCostPercent / 100);
+                                        const varVal = price * (biz.variableCostPercent / 100);
+                                        const totalDeductions = cost + fixedVal + varVal;
                                         const profitVal = price - totalDeductions;
                                         const profitPercent = price > 0 ? (profitVal / price) * 100 : 0;
 
-                                        const idealPrice = itemMarkup > 0 ? cost * itemMarkup : 0;
+                                        const idealPrice = computeIdealMenuPrice(cost, itemMarkup);
+                                        const channelIdealPrices = computeAllChannelPrices(idealPrice, biz.channels);
 
                                         return (
                                             <tr key={product.id} className="hover:bg-dark-700/30 transition-colors">
@@ -295,14 +271,14 @@ export function ResaleProducts() {
                                                     />
                                                 </td>
 
-                                                <td className="px-2 py-3 text-right text-slate-400">{fixedCostPercent.toFixed(2)}</td>
-                                                <td className="px-2 py-3 text-right text-slate-400">{variableRateTotal.toFixed(2)}</td>
+                                                <td className="px-2 py-3 text-right text-slate-400">{biz.fixedCostPercent.toFixed(2)}</td>
+                                                <td className="px-2 py-3 text-right text-slate-400">{biz.variableCostPercent.toFixed(2)}</td>
                                                 <td className="px-2 py-3 text-right text-slate-300">{cmvPercent.toFixed(1)}%</td>
 
                                                 <td className={`px-2 py-3 text-right font-bold ${profitVal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                                     R$ {profitVal.toFixed(2)}
                                                 </td>
-                                                <td className={`px-2 py-3 text-right font-bold ${profitPercent >= (settings?.desired_profit_percent || 0) ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                <td className={`px-2 py-3 text-right font-bold ${profitPercent >= biz.desiredProfitPercent ? 'text-emerald-400' : profitPercent >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
                                                     {profitPercent.toFixed(1)}%
                                                 </td>
 
@@ -322,9 +298,14 @@ export function ResaleProducts() {
                                                     />
                                                 </td>
 
-                                                <td className="px-2 py-3 text-right text-amber-400 border-l border-dark-700 bg-amber-900/5 font-bold">
+                                                <td className="px-2 py-3 text-right text-emerald-400 border-l border-dark-700 bg-emerald-900/5 font-bold">
                                                     {idealPrice > 0 ? `R$ ${idealPrice.toFixed(2)}` : '-'}
                                                 </td>
+                                                {channelIdealPrices.map(cp => (
+                                                    <td key={cp.channelId} className="px-2 py-3 text-right text-amber-400 border-l border-dark-700 bg-amber-900/5 font-bold">
+                                                        {cp.idealPrice > 0 ? `R$ ${cp.idealPrice.toFixed(2)}` : '-'}
+                                                    </td>
+                                                ))}
                                             </tr>
                                         );
                                     })
@@ -345,24 +326,31 @@ export function ResaleProducts() {
                         <div className="space-y-3 text-sm">
                             <div className="flex justify-between border-b border-dark-700 pb-2">
                                 <span className="text-slate-400">Custos Fixos (%)</span>
-                                <span className="text-slate-100">{fixedCostPercent.toFixed(2)}%</span>
+                                <span className="text-slate-100">{biz.fixedCostPercent.toFixed(2)}%</span>
                             </div>
                             <div className="flex justify-between border-b border-dark-700 pb-2">
                                 <span className="text-slate-400">Custos Variáveis (%)</span>
-                                <span className="text-slate-100">{variableRateTotal.toFixed(2)}%</span>
-                            </div>
-                            <div className="flex justify-between border-b border-dark-700 pb-2">
-                                <span className="text-slate-400">Taxa Plataforma (%)</span>
-                                <span className="text-slate-100">{platformTax.toFixed(2)}%</span>
+                                <span className="text-slate-100">{biz.variableCostPercent.toFixed(2)}%</span>
                             </div>
                             <div className="flex justify-between border-b border-dark-700 pb-2">
                                 <span className="text-slate-400">Lucro Desejado (%)</span>
-                                <span className="text-emerald-400 font-bold">{desiredProfit.toFixed(2)}%</span>
+                                <span className="text-emerald-400 font-bold">{biz.desiredProfitPercent.toFixed(2)}%</span>
                             </div>
                             <div className="pt-2">
-                                <div className="text-xs text-slate-500 uppercase mb-1">Markup Sugerido</div>
-                                <div className="text-3xl font-bold text-white">{itemMarkup.toFixed(2)}</div>
+                                <div className="text-xs text-slate-500 uppercase mb-1">Markup Calculado</div>
+                                <div className="text-3xl font-bold text-white">{itemMarkup.toFixed(2)}x</div>
                             </div>
+                            {biz.channels.length > 0 && (
+                                <div className="pt-2 border-t border-dark-700 mt-2">
+                                    <div className="text-xs text-blue-400 uppercase mb-2">Taxas por Canal</div>
+                                    {biz.channels.map(ch => (
+                                        <div key={ch.id} className="flex justify-between text-xs">
+                                            <span className="text-slate-400">{ch.name}</span>
+                                            <span className="text-blue-400">{ch.totalTaxRate.toFixed(1)}%</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 

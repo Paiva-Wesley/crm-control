@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import type { ProductWithCost, ProductCombo, BusinessSettings } from '../types';
+import type { ProductWithCost, ProductCombo } from '../types';
 import { Layers, Plus, Trash2, Save, Calculator, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useBusinessSettings } from '../hooks/useBusinessSettings';
+import { computeIdealMenuPrice, computeAllChannelPrices } from '../lib/pricing';
 
 export function Combos() {
     const { companyId } = useAuth();
@@ -16,8 +18,8 @@ export function Combos() {
     const [searchResults, setSearchResults] = useState<ProductWithCost[]>([]);
     const [showSearch, setShowSearch] = useState(false);
 
-    // Business Settings for Pricing
-    const [settings, setSettings] = useState<BusinessSettings | null>(null);
+    // Business Settings via pricing engine
+    const biz = useBusinessSettings();
 
     // Form State
     const [comboName, setComboName] = useState('');
@@ -25,7 +27,6 @@ export function Combos() {
 
     useEffect(() => {
         fetchCombos();
-        fetchSettings();
     }, []);
 
     useEffect(() => {
@@ -60,10 +61,7 @@ export function Combos() {
         }
     }
 
-    async function fetchSettings() {
-        const { data } = await supabase.from('business_settings').select('*').eq('company_id', companyId).limit(1).maybeSingle();
-        setSettings(data);
-    }
+    // Settings are now loaded via useBusinessSettings hook
 
     async function fetchComboItems(comboId: number) {
         // We need to fetch the child product details (especially CMV/cost)
@@ -224,41 +222,12 @@ export function Combos() {
         return acc + ((item.child_product?.sale_price || 0) * item.quantity);
     }, 0);
 
-    // Pricing Logic
-    // const desiredProfit = settings?.desired_profit_percent || 15;
-    const platformTax = settings?.platform_tax_rate || 18;
-    // const taxRate = 0; // Assuming Simples or similar, user usually sets this in pricing modal, here we simplify or fetch fees?
-    // Let's fetch fees sum for taxRate like in PricingModal
-
-
-    /*
-    useEffect(() => {
-        async function getFees() {
-            const { data } = await supabase.from('fees').select('percentage');
-            const total = data?.reduce((acc, curr) => acc + curr.percentage, 0) || 0;
-            setVariableRate(total);
-        }
-        getFees();
-    }, []);
-    */
-
-    // Reverse calc: Price = Cost / (1 - (Margin + Taxes)/100) ? 
-    // Or Markup? existing system uses Margin logic
-    // Markup Multiplier often used: Price = Cost * 3 (approx 33% COGS)
-    const suggestedPriceMarkup = totalCMV * 3;
-
-    // const grossMarginPercent = comboPrice > 0
-    //    ? ((comboPrice - totalCMV - (comboPrice * (variableRate / 100))) / comboPrice * 100)
-    //    : 0;
-    // Just remove it if unused or comment out properly.
-    // The previous code had it. I will remove it.
+    // Pricing Logic (via pricing engine)
+    const suggestedPriceMarkup = computeIdealMenuPrice(totalCMV, biz.markup);
+    const channelPrices = computeAllChannelPrices(comboPrice > 0 ? comboPrice : suggestedPriceMarkup, biz.channels);
 
     const discountValue = totalFullPrice - comboPrice;
     const discountPercent = totalFullPrice > 0 ? (discountValue / totalFullPrice) * 100 : 0;
-
-    const ifoodPrice = comboPrice / (1 - (platformTax / 100)); // Price to net the same after iFood tax?
-    // Usually: IfoodPrice - Taxes = NormalPrice
-    // IfoodPrice * (1 - rate) = NormalPrice -> IfoodPrice = NormalPrice / (1 - rate)
 
     return (
         <div className="space-y-6">
@@ -448,7 +417,7 @@ export function Combos() {
                                         <span className="font-bold text-amber-500">R$ {totalCMV.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between py-2 border-b border-dark-700">
-                                        <span className="text-slate-400">Preço Sugerido (Markup 3x)</span>
+                                        <span className="text-slate-400">Preço Sugerido (Markup {biz.markup > 0 ? biz.markup.toFixed(2) + 'x' : 'N/A'})</span>
                                         <span className="font-bold text-slate-200">R$ {suggestedPriceMarkup.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between py-2 border-b border-dark-700">
@@ -461,10 +430,17 @@ export function Combos() {
                                             {discountPercent.toFixed(1)}% (R$ {discountValue.toFixed(2)})
                                         </span>
                                     </div>
-                                    <div className="flex justify-between py-2 bg-emerald-500/10 px-2 rounded font-bold">
-                                        <span className="text-emerald-400">Preço Sugerido iFood (com Taxa {platformTax}%)</span>
-                                        <span className="text-emerald-400">R$ {ifoodPrice.toFixed(2)}</span>
-                                    </div>
+                                    {channelPrices.length > 0 && (
+                                        <>
+                                            <div className="text-xs text-blue-400 font-medium pt-2">Preço por Canal de Venda:</div>
+                                            {channelPrices.map(cp => (
+                                                <div key={cp.channelId} className="flex justify-between py-1 px-2 bg-blue-500/5 rounded">
+                                                    <span className="text-slate-400">{cp.channelName} <span className="text-xs text-slate-500">({cp.totalTaxRate.toFixed(1)}%)</span></span>
+                                                    <span className="font-bold text-blue-400">R$ {cp.idealPrice.toFixed(2)}</span>
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
