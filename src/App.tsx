@@ -5,6 +5,7 @@ import { Dashboard, Products, Ingredients, FixedCosts, Channels, Fees, BusinessD
 import { Combos } from './pages/Combos';
 import { Plans } from './pages/Plans';
 import { CmvAnalysis } from './pages/CmvAnalysis';
+import { VariableCosts } from './pages/VariableCosts';
 import { Login } from './pages/auth/Login';
 import { Signup } from './pages/auth/Signup';
 import { Onboarding } from './pages/auth/Onboarding';
@@ -54,6 +55,7 @@ function App() {
                 <Route path="products" element={<Products />} />
                 <Route path="ingredients" element={<Ingredients />} />
                 <Route path="fixed-costs" element={<FixedCosts />} />
+                <Route path="variable-costs" element={<VariableCosts />} />
                 <Route path="channels" element={<Channels />} />
                 <Route path="fees" element={<Fees />} />
                 <Route path="cmv-analysis" element={<CmvAnalysis />} />

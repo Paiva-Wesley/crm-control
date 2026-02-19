@@ -44,7 +44,7 @@ export function Layout() {
         const path = location.pathname;
         if (path.includes('/ingredients')) {
             setOpenGroup('itens');
-        } else if (path.includes('/fixed-costs')) {
+        } else if (path.includes('/fixed-costs') || path.includes('/variable-costs')) {
             setOpenGroup('custos');
         } else {
             setOpenGroup(null);
@@ -201,15 +201,15 @@ export function Layout() {
                         </Link>
                     </NavGroup>
 
-                    {/* Group: Custos Fixos */}
+                    {/* Group: Custos */}
                     <NavGroup
                         id="custos"
-                        label="Custos Fixos"
+                        label="Custos"
                         icon={DollarSign}
                         sidebarOpen={sidebarOpen}
                         isOpen={openGroup === 'custos'}
                         onToggle={handleToggle}
-                        isActive={location.pathname.includes('/fixed-costs')}
+                        isActive={location.pathname.includes('/fixed-costs') || location.pathname.includes('/variable-costs')}
                     >
                         <Link
                             to="/fixed-costs?tab=Equipe"
@@ -238,6 +238,20 @@ export function Layout() {
                         >
                             <Calculator size={18} />
                             {sidebarOpen && <span className="text-sm">Despesas Mensais</span>}
+                        </Link>
+                        <Link
+                            to="/variable-costs"
+                            className={`
+                                flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
+                                ${sidebarOpen ? 'pl-12' : ''}
+                                ${location.pathname === '/variable-costs'
+                                    ? 'bg-primary text-white'
+                                    : 'text-slate-400 hover:bg-dark-700 hover:text-white'
+                                }
+                            `}
+                        >
+                            <PieChart size={18} />
+                            {sidebarOpen && <span className="text-sm">Custos Variáveis</span>}
                         </Link>
                     </NavGroup>
 
@@ -312,12 +326,14 @@ export function Layout() {
             )}
 
             {/* Main Content */}
-            <main className="flex-1 flex flex-col overflow-hidden">
+            <main className="flex-1 flex flex-col overflow-hidden bg-dark-900">
                 <header className="h-16 flex items-center justify-between px-4 md:px-6 border-b border-dark-700 bg-dark-900">
                     <h1 className="text-lg md:text-xl font-semibold text-slate-100">Gestão de Custos e Precificação</h1>
                 </header>
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-dark-900">
-                    <Outlet />
+                <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                    <div className="max-w-[1200px] mx-auto w-full pb-20">
+                        <Outlet />
+                    </div>
                 </div>
             </main>
         </div>

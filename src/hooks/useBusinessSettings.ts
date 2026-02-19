@@ -20,8 +20,10 @@ export interface BusinessPricingData {
     settings: BusinessSettings | null;
     /** Total monthly fixed costs in R$ */
     totalFixedCosts: number;
-    /** Sum of all fees percentages (variable cost %) */
+    /** Business variable costs as % of average revenue */
     variableCostPercent: number;
+    /** Business variable costs total in R$ */
+    variableCostsTotal: number;
     /** Fixed costs as % of average monthly revenue */
     fixedCostPercent: number;
     /** Average monthly revenue */
@@ -57,6 +59,7 @@ export function useBusinessSettings(): BusinessPricingData {
     const [settings, setSettings] = useState<BusinessSettings | null>(null);
     const [totalFixedCosts, setTotalFixedCosts] = useState(0);
     const [variableCostPercent, setVariableCostPercent] = useState(0);
+    const [variableCostsTotal, setVariableCostsTotal] = useState(0);
     const [averageMonthlyRevenue, setAverageMonthlyRevenue] = useState(0);
     const [channels, setChannels] = useState<ChannelWithTaxRate[]>([]);
     const [loading, setLoading] = useState(true);
@@ -85,15 +88,11 @@ export function useBusinessSettings(): BusinessPricingData {
                 0
             );
 
-            // 3. Fees (variable costs %)
-            const { data: feesData } = await supabase
-                .from('fees')
-                .select('id, percentage');
-
-            const totalFees = (feesData || []).reduce(
-                (acc, curr) => acc + (parseFloat(curr.percentage as any) || 0),
-                0
-            );
+            // 3. Business Variable Costs (from variable_costs table, NOT fees)
+            const { data: varCostsData } = await supabase
+                .from('variable_costs')
+                .select('type, monthly_value, percentage')
+                .eq('company_id', companyId);
 
             // 4. Monthly Revenue
             const { data: revenueData } = await supabase
@@ -105,11 +104,34 @@ export function useBusinessSettings(): BusinessPricingData {
                 (acc, curr) => acc + (parseFloat(curr.revenue as any) || 0),
                 0
             );
-            const avgRev = revenueData && revenueData.length > 0
-                ? totalRevenue / revenueData.length
-                : 0;
+            let avgRev = 0;
+            const inputMode = (settingsData as any)?.revenue_input_mode || 'single';
 
-            // 5. Sales Channels with their fees
+            if (inputMode === 'monthly') {
+                avgRev = revenueData && revenueData.length > 0
+                    ? totalRevenue / revenueData.length
+                    : 0;
+            } else {
+                avgRev = parseFloat((settingsData as any)?.average_monthly_revenue_input) || 0;
+            }
+
+            // Calculate variable costs (spreadsheet logic)
+            const variableFixedTotal = (varCostsData || [])
+                .filter((v: any) => v.type === 'fixed')
+                .reduce((acc, v: any) => acc + (parseFloat(v.monthly_value) || 0), 0);
+            const variablePercentTotal = (varCostsData || [])
+                .filter((v: any) => v.type === 'percent')
+                .reduce((acc, v: any) => acc + (parseFloat(v.percentage) || 0), 0);
+
+            const varTotal = variableFixedTotal + (avgRev > 0 ? avgRev * (variablePercentTotal / 100) : 0);
+            const varPercent = avgRev > 0 ? (varTotal / avgRev) * 100 : 0;
+
+            // 5. Fees (only for per-channel tax rates, NOT for business variable costs)
+            const { data: feesData } = await supabase
+                .from('fees')
+                .select('id, percentage');
+
+            // 6. Sales Channels with their fees
             const { data: channelsData } = await supabase
                 .from('sales_channels')
                 .select('id, name')
@@ -143,7 +165,8 @@ export function useBusinessSettings(): BusinessPricingData {
             // Set state
             setSettings(settingsData as BusinessSettings | null);
             setTotalFixedCosts(fixedTotal);
-            setVariableCostPercent(totalFees);
+            setVariableCostPercent(varPercent);
+            setVariableCostsTotal(varTotal);
             setAverageMonthlyRevenue(avgRev);
             setChannels(channelsWithTaxRates);
 
@@ -172,6 +195,7 @@ export function useBusinessSettings(): BusinessPricingData {
         settings,
         totalFixedCosts,
         variableCostPercent,
+        variableCostsTotal,
         fixedCostPercent,
         averageMonthlyRevenue,
         markup,

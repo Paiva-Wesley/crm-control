@@ -130,10 +130,13 @@ export function Channels() {
     }
 
     return (
-        <div className="page-container">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold">Canais de Venda</h2>
-                <Button onClick={() => setIsModalOpen(true)} leftIcon={<Plus size={20} />}>
+        <div className="space-y-6 fade-in">
+            <div className="page-header">
+                <div>
+                    <h2 className="page-title">Canais de Venda</h2>
+                    <p className="page-subtitle">Gerencie as taxas de cada canal de venda</p>
+                </div>
+                <Button onClick={() => setIsModalOpen(true)} leftIcon={<Plus size={20} />} className="btn-primary self-center md:self-end">
                     Novo Canal
                 </Button>
             </div>
@@ -152,39 +155,48 @@ export function Channels() {
                         const totalFees = channel.fees.reduce((acc, f) => acc + f.percentage, 0);
 
                         return (
-                            <div key={channel.id} className="card">
-                                <div className="flex justify-between items-start mb-4">
-                                    <h3 className="text-xl font-bold">{channel.name}</h3>
+                            <div key={channel.id} className="glass-card p-6 flex flex-col h-full hover:border-slate-600/50 transition-colors">
+                                <div className="flex justify-between items-start mb-6">
+                                    <h3 className="text-xl font-bold text-white">{channel.name}</h3>
                                     <Button
                                         variant="danger"
                                         size="sm"
                                         onClick={() => handleDeleteChannel(channel.id)}
-                                        className="h-8 w-8 p-0"
+                                        className="h-8 w-8 p-0 opacity-60 hover:opacity-100 transition-opacity"
+                                        title="Excluir canal"
                                     >
-                                        <Trash2 size={18} />
+                                        <Trash2 size={16} />
                                     </Button>
                                 </div>
 
-                                <div className="bg-secondary p-3 rounded-lg mb-4">
-                                    <div className="text-secondary text-sm mb-1">Custo Total de Taxas</div>
-                                    <div className="text-2xl font-bold text-warning">{totalFees.toFixed(2)}%</div>
+                                <div className="bg-slate-800/50 p-4 rounded-xl mb-6 border border-slate-700/50">
+                                    <div className="text-slate-400 text-xs uppercase tracking-wider font-medium mb-1">Custo Total de Taxas</div>
+                                    <div className="text-3xl font-bold text-emerald-400">{totalFees.toFixed(2)}%</div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <h4 className="text-sm font-bold text-secondary uppercase">Taxas Aplicadas</h4>
-                                    {channel.fees.length === 0 && <p className="text-sm text-secondary italic">Nenhuma taxa configurada</p>}
+                                <div className="space-y-3 flex-1 mb-6">
+                                    <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                                        Taxas Aplicadas
+                                        <span className="text-xs font-normal text-slate-500 normal-case">({channel.fees.length})</span>
+                                    </h4>
 
-                                    {channel.fees.map(fee => (
-                                        <div key={fee.id} className="flex justify-between text-sm border-b border-color pb-1">
-                                            <span>{fee.name}</span>
-                                            <span>{fee.percentage}%</span>
-                                        </div>
-                                    ))}
+                                    {channel.fees.length === 0 && (
+                                        <p className="text-sm text-slate-500 italic py-2">Nenhuma taxa configurada</p>
+                                    )}
+
+                                    <div className="space-y-2">
+                                        {channel.fees.map(fee => (
+                                            <div key={fee.id} className="flex justify-between items-center text-sm p-2 rounded bg-slate-800/30">
+                                                <span className="text-slate-300">{fee.name}</span>
+                                                <span className="font-bold text-slate-200">{fee.percentage}%</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
 
                                 <Button
                                     variant="ghost"
-                                    className="w-full mt-4 border border-color"
+                                    className="w-full mt-auto border border-slate-700 hover:bg-slate-800 text-slate-300"
                                     onClick={() => openFeeModal(channel)}
                                     leftIcon={<Settings size={16} />}
                                 >

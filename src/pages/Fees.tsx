@@ -55,15 +55,18 @@ export function Fees() {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-slate-100">Taxas e Impostos</h2>
-                <Button onClick={() => setIsModalOpen(true)} leftIcon={<Plus size={20} />}>
+        <div className="space-y-6 fade-in">
+            <div className="page-header">
+                <div>
+                    <h2 className="page-title">Taxas e Impostos</h2>
+                    <p className="page-subtitle">Gerencie as taxas que incidem sobre suas vendas</p>
+                </div>
+                <Button onClick={() => setIsModalOpen(true)} leftIcon={<Plus size={20} />} className="btn-primary self-center md:self-end">
                     Nova Taxa
                 </Button>
             </div>
 
-            <div className="bg-dark-800 border border-dark-700 rounded-lg overflow-hidden">
+            <div className="glass-card overflow-hidden">
                 {fees.length === 0 ? (
                     <EmptyState
                         icon={Calculator}
@@ -73,27 +76,28 @@ export function Fees() {
                         onAction={() => setIsModalOpen(true)}
                     />
                 ) : (
-                    <table className="w-full">
+                    <table className="data-table text-sm">
                         <thead>
-                            <tr className="border-b border-dark-700">
-                                <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Descrição</th>
-                                <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Porcentagem</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-slate-400 uppercase tracking-wider w-20">Ações</th>
+                            <tr>
+                                <th className="pl-6">Descrição</th>
+                                <th className="text-left">Porcentagem</th>
+                                <th className="text-right w-20 pr-6">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {fees.map(fee => (
-                                <tr key={fee.id} className="border-b border-dark-700 hover:bg-dark-700/50 transition-colors">
-                                    <td className="px-4 py-4 text-slate-100">{fee.name}</td>
-                                    <td className="px-4 py-4 text-slate-300">{fee.percentage}%</td>
-                                    <td className="px-4 py-4 text-right">
+                                <tr key={fee.id} className="hover:bg-slate-700/20 transition-colors">
+                                    <td className="pl-6 font-medium text-slate-200">{fee.name}</td>
+                                    <td className="text-slate-300 font-bold">{fee.percentage}%</td>
+                                    <td className="text-right pr-6">
                                         <Button
                                             variant="danger"
                                             size="sm"
                                             onClick={() => handleDelete(fee.id)}
                                             className="h-8 w-8 p-0"
+                                            title="Excluir"
                                         >
-                                            <Trash2 size={18} />
+                                            <Trash2 size={16} />
                                         </Button>
                                     </td>
                                 </tr>

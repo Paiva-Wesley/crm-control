@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { DollarSign, Search, AlertCircle, TrendingUp, Plus } from 'lucide-react';
+import { Search, TrendingUp, Plus } from 'lucide-react';
+import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { Modal } from '../components/ui/Modal';
@@ -183,14 +184,20 @@ export function ResaleProducts() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-                    <TrendingUp className="text-emerald-400" />
-                    Precificação de Bebidas / Revenda
-                </h2>
+            {/* Header */}
+            <div className="page-header">
+                <div>
+                    <h2 className="page-title flex items-center gap-2">
+                        <TrendingUp className="text-emerald-400" size={32} />
+                        Revenda
+                    </h2>
+                    <p className="page-subtitle">
+                        Gerencie preços de venda e margens de lucro para produtos de revenda.
+                    </p>
+                </div>
 
-                <div className="flex gap-2 w-full md:w-auto">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg w-full md:w-80">
+                <div className="flex gap-2 w-full md:w-auto self-end">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg w-full md:w-80 active:border-primary/50 focus-within:border-primary/50 transition-colors">
                         <Search size={20} className="text-slate-400" />
                         <input
                             type="text"
@@ -200,169 +207,131 @@ export function ResaleProducts() {
                             className="bg-transparent border-none outline-none text-slate-100 placeholder-slate-400 w-full focus:ring-0"
                         />
                     </div>
-                    <button
+                    <Button
                         onClick={() => setIsModalOpen(true)}
-                        className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg flex items-center gap-2 whitespace-nowrap"
+                        leftIcon={<Plus size={20} />}
+                        className="btn-primary"
                     >
-                        <Plus size={20} /> Nova Bebida
-                    </button>
+                        Nova Bebida
+                    </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-                {/* Main Table Area */}
-                <div className="lg:col-span-3 card bg-dark-800 border border-dark-700 rounded-lg overflow-hidden flex flex-col">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-dark-900 border-b border-dark-700 text-slate-400 uppercase text-xs">
-                                    <th className="px-4 py-3 text-left sticky left-0 bg-dark-900 z-10 w-48">Item</th>
-                                    <th className="px-2 py-3 text-right text-emerald-400 bg-emerald-900/10">Val. Compra</th>
-                                    <th className="px-2 py-3 text-right">Fixos %</th>
-                                    <th className="px-2 py-3 text-right">Var %</th>
-                                    <th className="px-2 py-3 text-right">CMV %</th>
-                                    <th className="px-2 py-3 text-right font-bold text-emerald-400">Lucro R$</th>
-                                    <th className="px-2 py-3 text-right font-bold">Lucro %</th>
-                                    <th className="px-2 py-3 text-right text-slate-400 border-l border-dark-700">Preço Médio</th>
-                                    <th className="px-2 py-3 text-right text-blue-400 bg-blue-900/10 border-l border-dark-700">Preço Tabela</th>
-                                    <th className="px-2 py-3 text-right text-emerald-400 bg-emerald-900/10 border-l border-dark-700">Ideal Cardápio</th>
-                                    {biz.channels.map(ch => (
-                                        <th key={ch.id} className="px-2 py-3 text-right text-amber-400 bg-amber-900/10 border-l border-dark-700 text-xs">Ideal {ch.name}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-dark-700">
-                                {filteredProducts.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={10} className="px-4 py-8 text-center text-slate-400">
-                                            Nenhuma bebida encontrada. Clique em "Nova Bebida" para cadastrar.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredProducts.map(product => {
-                                        const cost = productCosts[product.id] || 0;
-                                        const price = product.sale_price || 0;
-
-                                        // Calculations
-                                        const cmvPercent = price > 0 ? (cost / price) * 100 : 0;
-
-                                        const fixedVal = price * (biz.fixedCostPercent / 100);
-                                        const varVal = price * (biz.variableCostPercent / 100);
-                                        const totalDeductions = cost + fixedVal + varVal;
-                                        const profitVal = price - totalDeductions;
-                                        const profitPercent = price > 0 ? (profitVal / price) * 100 : 0;
-
-                                        const idealPrice = computeIdealMenuPrice(cost, itemMarkup);
-                                        const channelIdealPrices = computeAllChannelPrices(idealPrice, biz.channels);
-
-                                        return (
-                                            <tr key={product.id} className="hover:bg-dark-700/30 transition-colors">
-                                                <td className="px-4 py-3 font-medium text-slate-100 sticky left-0 bg-dark-800">{product.name}</td>
-
-                                                {/* Input Cost */}
-                                                <td className="px-2 py-3 text-right bg-emerald-900/5">
-                                                    <input
-                                                        type="number" step="0.01"
-                                                        value={cost || ''}
-                                                        onChange={e => handleLocalUpdate(product.id, 'cost_price', e.target.value)}
-                                                        onBlur={e => handleSaveProduct(product.id, 'cost_price', parseFloat(e.target.value) || 0)}
-                                                        className="w-20 text-right bg-dark-700 border border-dark-600 rounded px-1 text-emerald-400 focus:border-emerald-500 focus:outline-none"
-                                                    />
-                                                </td>
-
-                                                <td className="px-2 py-3 text-right text-slate-400">{biz.fixedCostPercent.toFixed(2)}</td>
-                                                <td className="px-2 py-3 text-right text-slate-400">{biz.variableCostPercent.toFixed(2)}</td>
-                                                <td className="px-2 py-3 text-right text-slate-300">{cmvPercent.toFixed(1)}%</td>
-
-                                                <td className={`px-2 py-3 text-right font-bold ${profitVal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    R$ {profitVal.toFixed(2)}
-                                                </td>
-                                                <td className={`px-2 py-3 text-right font-bold ${profitPercent >= biz.desiredProfitPercent ? 'text-emerald-400' : profitPercent >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
-                                                    {profitPercent.toFixed(1)}%
-                                                </td>
-
-                                                {/* Avg Price removed as column removed from DB, or we can keep it purely optional if we have a way to inject it, but safer to skip or show placeholder */}
-                                                <td className="px-2 py-3 text-right text-slate-400 border-l border-dark-700 text-xs">
-                                                    -
-                                                </td>
-
-                                                {/* Input Price (Table Price) */}
-                                                <td className="px-2 py-3 text-right border-l border-dark-700 bg-blue-900/5">
-                                                    <input
-                                                        type="number" step="0.01"
-                                                        value={price || ''}
-                                                        onChange={e => handleLocalUpdate(product.id, 'sale_price', e.target.value)}
-                                                        onBlur={e => handleSaveProduct(product.id, 'sale_price', parseFloat(e.target.value) || 0)}
-                                                        className="w-20 text-right bg-dark-700 border border-dark-600 rounded px-1 text-blue-400 focus:border-blue-500 focus:outline-none"
-                                                    />
-                                                </td>
-
-                                                <td className="px-2 py-3 text-right text-emerald-400 border-l border-dark-700 bg-emerald-900/5 font-bold">
-                                                    {idealPrice > 0 ? `R$ ${idealPrice.toFixed(2)}` : '-'}
-                                                </td>
-                                                {channelIdealPrices.map(cp => (
-                                                    <td key={cp.channelId} className="px-2 py-3 text-right text-amber-400 border-l border-dark-700 bg-amber-900/5 font-bold">
-                                                        {cp.idealPrice > 0 ? `R$ ${cp.idealPrice.toFixed(2)}` : '-'}
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="glass-card p-4 border-l-4 border-l-slate-500">
+                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Custos Fixos</p>
+                    <h3 className="text-xl font-bold text-white mt-1">{biz.fixedCostPercent.toFixed(2)}%</h3>
                 </div>
+                <div className="glass-card p-4 border-l-4 border-l-slate-500">
+                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Custos Variáveis</p>
+                    <h3 className="text-xl font-bold text-white mt-1">{biz.variableCostPercent.toFixed(2)}%</h3>
+                </div>
+                <div className="glass-card p-4 border-l-4 border-l-emerald-500">
+                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Lucro Desejado</p>
+                    <h3 className="text-xl font-bold text-emerald-400 mt-1">{biz.desiredProfitPercent.toFixed(2)}%</h3>
+                </div>
+                <div className="glass-card p-4 border-l-4 border-l-amber-500">
+                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Markup Global</p>
+                    <h3 className="text-xl font-bold text-amber-400 mt-1">{itemMarkup.toFixed(2)}x</h3>
+                </div>
+            </div>
 
-                {/* Right Panel Summary */}
-                <div className="space-y-6">
-                    <div className="card bg-dark-800 border border-dark-700 rounded-lg p-6">
-                        <h3 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
-                            <DollarSign className="text-amber-400" size={20} />
-                            Resumo de Custos Global
-                        </h3>
-                        {/* Summary Details */}
-                        <div className="space-y-3 text-sm">
-                            <div className="flex justify-between border-b border-dark-700 pb-2">
-                                <span className="text-slate-400">Custos Fixos (%)</span>
-                                <span className="text-slate-100">{biz.fixedCostPercent.toFixed(2)}%</span>
-                            </div>
-                            <div className="flex justify-between border-b border-dark-700 pb-2">
-                                <span className="text-slate-400">Custos Variáveis (%)</span>
-                                <span className="text-slate-100">{biz.variableCostPercent.toFixed(2)}%</span>
-                            </div>
-                            <div className="flex justify-between border-b border-dark-700 pb-2">
-                                <span className="text-slate-400">Lucro Desejado (%)</span>
-                                <span className="text-emerald-400 font-bold">{biz.desiredProfitPercent.toFixed(2)}%</span>
-                            </div>
-                            <div className="pt-2">
-                                <div className="text-xs text-slate-500 uppercase mb-1">Markup Calculado</div>
-                                <div className="text-3xl font-bold text-white">{itemMarkup.toFixed(2)}x</div>
-                            </div>
-                            {biz.channels.length > 0 && (
-                                <div className="pt-2 border-t border-dark-700 mt-2">
-                                    <div className="text-xs text-blue-400 uppercase mb-2">Taxas por Canal</div>
-                                    {biz.channels.map(ch => (
-                                        <div key={ch.id} className="flex justify-between text-xs">
-                                            <span className="text-slate-400">{ch.name}</span>
-                                            <span className="text-blue-400">{ch.totalTaxRate.toFixed(1)}%</span>
-                                        </div>
-                                    ))}
-                                </div>
+            {/* Main Table Area */}
+            <div className="glass-card overflow-hidden flex flex-col">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr>
+                                <th className="sticky left-0 bg-slate-800 z-10 w-48 shadow-lg p-3 font-medium text-slate-300">Item</th>
+                                <th className="text-right text-emerald-400 bg-emerald-900/10 p-3 font-medium">Val. Compra</th>
+                                <th className="text-right p-3 font-medium text-slate-400">Fixos %</th>
+                                <th className="text-right p-3 font-medium text-slate-400">Var %</th>
+                                <th className="text-right p-3 font-medium text-slate-300">CMV %</th>
+                                <th className="text-right font-bold text-emerald-400 p-3">Lucro R$</th>
+                                <th className="text-right font-bold p-3 text-slate-300">Lucro %</th>
+                                <th className="text-right text-blue-400 bg-blue-900/10 border-l border-slate-700/50 p-3 font-medium">Preço Venda</th>
+                                <th className="text-right text-emerald-400 bg-emerald-900/10 border-l border-slate-700/50 p-3 font-medium">Ideal Cardápio</th>
+                                {biz.channels.map(ch => (
+                                    <th key={ch.id} className="text-right text-amber-400 bg-amber-900/10 border-l border-slate-700/50 p-3 font-medium whitespace-nowrap">Ideal {ch.name}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredProducts.length === 0 ? (
+                                <tr>
+                                    <td colSpan={10 + biz.channels.length} className="text-center text-slate-400 py-8">
+                                        Nenhuma bebida encontrada. Clique em "Nova Bebida" para cadastrar.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredProducts.map(product => {
+                                    const cost = productCosts[product.id] || 0;
+                                    const price = product.sale_price || 0;
+
+                                    // Calculations
+                                    const cmvPercent = price > 0 ? (cost / price) * 100 : 0;
+
+                                    const fixedVal = price * (biz.fixedCostPercent / 100);
+                                    const varVal = price * (biz.variableCostPercent / 100);
+                                    const totalDeductions = cost + fixedVal + varVal;
+                                    const profitVal = price - totalDeductions;
+                                    const profitPercent = price > 0 ? (profitVal / price) * 100 : 0;
+
+                                    const idealPrice = computeIdealMenuPrice(cost, itemMarkup);
+                                    const channelIdealPrices = computeAllChannelPrices(idealPrice, biz.channels);
+
+                                    return (
+                                        <tr key={product.id} className="hover:bg-slate-700/20 transition-colors border-b border-slate-800/50">
+                                            <td className="font-medium text-slate-100 sticky left-0 bg-slate-800/95 shadow-lg z-10 p-3">{product.name}</td>
+
+                                            {/* Input Cost */}
+                                            <td className="text-right bg-emerald-900/5 p-2">
+                                                <input
+                                                    type="number" step="0.01"
+                                                    value={cost || ''}
+                                                    onChange={e => handleLocalUpdate(product.id, 'cost_price', e.target.value)}
+                                                    onBlur={e => handleSaveProduct(product.id, 'cost_price', parseFloat(e.target.value) || 0)}
+                                                    className="w-20 text-right bg-dark-700 border border-dark-600 rounded px-1 text-emerald-400 focus:border-emerald-500 focus:outline-none text-xs h-7"
+                                                />
+                                            </td>
+
+                                            <td className="text-right text-slate-500 p-3">{biz.fixedCostPercent.toFixed(1)}</td>
+                                            <td className="text-right text-slate-500 p-3">{biz.variableCostPercent.toFixed(1)}</td>
+                                            <td className="text-right text-slate-300 p-3">{cmvPercent.toFixed(1)}%</td>
+
+                                            <td className={`text-right font-bold p-3 ${profitVal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                R$ {profitVal.toFixed(2)}
+                                            </td>
+                                            <td className={`text-right font-bold p-3 ${profitPercent >= biz.desiredProfitPercent ? 'text-emerald-400' : profitPercent >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                                                {profitPercent.toFixed(1)}%
+                                            </td>
+
+                                            {/* Input Price (Table Price) */}
+                                            <td className="text-right border-l border-slate-700/50 bg-blue-900/5 p-2">
+                                                <input
+                                                    type="number" step="0.01"
+                                                    value={price || ''}
+                                                    onChange={e => handleLocalUpdate(product.id, 'sale_price', e.target.value)}
+                                                    onBlur={e => handleSaveProduct(product.id, 'sale_price', parseFloat(e.target.value) || 0)}
+                                                    className="w-20 text-right bg-dark-700 border border-dark-600 rounded px-1 text-blue-400 focus:border-blue-500 focus:outline-none text-xs h-7"
+                                                />
+                                            </td>
+
+                                            <td className="text-right text-emerald-400 border-l border-slate-700/50 bg-emerald-900/5 font-bold p-3">
+                                                {idealPrice > 0 ? `R$ ${idealPrice.toFixed(2)}` : '-'}
+                                            </td>
+                                            {channelIdealPrices.map(cp => (
+                                                <td key={cp.channelId} className="text-right text-amber-400 border-l border-slate-700/50 bg-amber-900/5 font-bold p-3">
+                                                    {cp.idealPrice > 0 ? `R$ ${cp.idealPrice.toFixed(2)}` : '-'}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    );
+                                })
                             )}
-                        </div>
-                    </div>
-
-                    <div className="card bg-dark-800 border border-dark-700 rounded-lg p-6">
-                        <div className="flex items-start gap-2 text-slate-400 text-sm">
-                            <AlertCircle size={16} className="mt-0.5" />
-                            <p>
-                                Para ajustar as taxas globais e custos fixos, utilize o menu
-                                <strong className="text-white"> Dados</strong>.
-                            </p>
-                        </div>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

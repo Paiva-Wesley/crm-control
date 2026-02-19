@@ -33,4 +33,77 @@
   .search-box input:focus {
     @apply outline-none ring-0;
   }
+
+  /* Global Design System Utilities */
+  .glass-card {
+    @apply bg-slate-800/50 border border-slate-700/50 rounded-xl shadow-sm backdrop-blur-sm;
+  }
+
+  .page-header {
+    @apply flex justify-between items-end mb-8 border-b border-slate-800 pb-6;
+  }
+
+  .page-title {
+    @apply text-3xl font-bold text-white tracking-tight mb-2;
+  }
+
+  .page-subtitle {
+    @apply text-slate-400 text-sm max-w-lg;
+  }
+
+  .btn-primary {
+    @apply flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-lg shadow-blue-900/20 transition-all;
+  }
+
+  .btn-secondary {
+    @apply flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-all border border-slate-700;
+  }
+
+  /* Form Elements */
+  .input {
+    @apply block w-full rounded-lg border-dark-700 bg-dark-800 text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 px-3 border transition-colors;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-slate-400 mb-1;
+  }
+
+  /* Table Styles */
+  .data-table {
+    @apply w-full text-left border-collapse;
+  }
+
+  .data-table th {
+    @apply text-xs uppercase tracking-wider text-slate-500 font-medium p-4 border-b border-slate-700/50 bg-slate-800/30;
+  }
+
+  .data-table td {
+    @apply p-4 border-b border-slate-700/50 text-slate-300;
+  }
+
+  .data-table tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-slate-700/20 transition-colors;
+  }
+}
+
+@layer utilities {
+  .fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }

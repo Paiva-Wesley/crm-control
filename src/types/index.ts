@@ -103,6 +103,8 @@ export interface BusinessSettings {
     estimated_monthly_sales: number;
     fixed_cost_allocation_mode: 'revenue_based' | 'per_unit';
     target_cmv_percent: number;
+    revenue_input_mode: 'single' | 'monthly';
+    average_monthly_revenue_input: number;
 }
 
 export interface MonthlyRevenue {

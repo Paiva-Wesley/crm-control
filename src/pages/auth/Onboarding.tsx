@@ -45,25 +45,25 @@ export function Onboarding() {
         >
             <form className="space-y-6" onSubmit={handleCreateCompany}>
                 {error && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-md text-sm">
                         {error}
                     </div>
                 )}
 
                 <div>
-                    <label htmlFor="companyName" className="block text-sm font-medium text-slate-700">
+                    <label htmlFor="companyName" className="label">
                         Nome do Estabelecimento
                     </label>
                     <div className="mt-1 relative rounded-md shadow-sm">
                         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                            <Building2 className="h-5 w-5 text-slate-400" />
+                            <Building2 className="h-5 w-5 text-slate-500" />
                         </div>
                         <input
                             type="text"
                             name="companyName"
                             id="companyName"
                             required
-                            className="block w-full rounded-md border-slate-300 pl-10 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 border"
+                            className="input pl-10"
                             placeholder="Ex: Hamburgueria do João"
                             value={companyName}
                             onChange={(e) => setCompanyName(e.target.value)}
@@ -74,7 +74,7 @@ export function Onboarding() {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                    className="btn btn-primary w-full justify-center"
                 >
                     {loading ? (
                         <Loader2 className="h-5 w-5 animate-spin" />

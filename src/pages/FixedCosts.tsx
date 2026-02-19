@@ -215,12 +215,12 @@ export function FixedCosts() {
 
     return (
         <div className="space-y-6 fade-in">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-2">
+            <div className="page-header">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-100">Custos Fixos e Mão de Obra</h2>
-                    <p className="text-slate-400 text-sm">Gerencie sua equipe e despesas mensais</p>
+                    <h2 className="page-title">Custos Fixos e Mão de Obra</h2>
+                    <p className="page-subtitle">Gerencie sua equipe e despesas mensais</p>
                 </div>
-                <div className="mt-4 md:mt-0 flex bg-dark-800 rounded-lg p-1 border border-dark-700 gap-1">
+                <div className="flex glass-card p-1 gap-1 self-end md:self-auto">
                     <Button
                         variant={activeTab === 'Equipe' ? 'primary' : 'ghost'}
                         onClick={() => setActiveTab('Equipe')}
@@ -238,7 +238,7 @@ export function FixedCosts() {
                 </div>
             </div>
 
-            <div className="card bg-dark-800 border-l-4 border-l-primary p-4 flex justify-between items-center">
+            <div className="glass-card border-l-4 border-l-primary p-6 flex justify-between items-center">
                 <div>
                     <span className="text-slate-400 text-sm font-medium uppercase tracking-wider">Total {activeTab}</span>
                 </div>
@@ -259,14 +259,14 @@ export function FixedCosts() {
                         costs={costs.filter(c => c.category === 'Salários CLT' || c.category === 'CLT')}
                         totalValue={costs.filter(c => c.category === 'Salários CLT' || c.category === 'CLT').reduce((acc, c) => acc + c.monthly_value, 0)}
                     >
-                        <table className="w-full text-sm">
+                        <table className="data-table text-sm">
                             <thead>
-                                <tr className="text-slate-400 border-b border-dark-700 text-left">
-                                    <th className="pb-2 pl-2">Funcionário</th>
-                                    <th className="pb-2 text-right">Salário Base</th>
-                                    <th className="pb-2 text-right">Encargos (13º/Férias/FGTS)</th>
-                                    <th className="pb-2 text-right">Total Mensal</th>
-                                    <th className="pb-2 w-10"></th>
+                                <tr>
+                                    <th className="pl-4">Funcionário</th>
+                                    <th className="text-right">Salário Base</th>
+                                    <th className="text-right">Encargos (13º/Férias/FGTS)</th>
+                                    <th className="text-right">Total Mensal</th>
+                                    <th className="w-10"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -274,7 +274,7 @@ export function FixedCosts() {
                                     <tr key={cost.id} className="border-b border-dark-700/50 hover:bg-dark-700/30 group">
                                         <td className="py-2 pl-2">
                                             <input
-                                                className="bg-transparent border-none focus:ring-0 text-white w-full"
+                                                className="bg-transparent border-none focus:ring-0 text-white w-full placeholder-slate-600"
                                                 value={cost.name}
                                                 onChange={e => handleUpdateCost(cost.id, { name: e.target.value })}
                                                 placeholder="Nome do Funcionário"
@@ -283,7 +283,7 @@ export function FixedCosts() {
                                         <td className="py-2 text-right">
                                             <input
                                                 type="number"
-                                                className="bg-dark-700 rounded border border-dark-600 w-24 text-right px-2 py-1 text-white focus:border-blue-500 outline-none"
+                                                className="input w-24 text-right py-1 h-8"
                                                 value={cost.config?.base_salary || ''}
                                                 onChange={e => updateCLT(cost, parseFloat(e.target.value) || 0)}
                                             />
@@ -330,15 +330,15 @@ export function FixedCosts() {
                         costs={costs.filter(c => c.category === 'Salários Freelancer' || c.category === 'Freelancer')}
                         totalValue={costs.filter(c => c.category === 'Salários Freelancer' || c.category === 'Freelancer').reduce((acc, c) => acc + c.monthly_value, 0)}
                     >
-                        <table className="w-full text-sm">
+                        <table className="data-table text-sm">
                             <thead>
-                                <tr className="text-slate-400 border-b border-dark-700 text-left">
-                                    <th className="pb-2 pl-2">Função / Pessoa</th>
-                                    <th className="pb-2 text-right">Diária</th>
-                                    <th className="pb-2 text-right">Qtd Pessoas</th>
-                                    <th className="pb-2 text-right">Dias/Mês</th>
-                                    <th className="pb-2 text-right">Total</th>
-                                    <th className="pb-2 w-10"></th>
+                                <tr>
+                                    <th className="pl-4">Função / Pessoa</th>
+                                    <th className="text-right">Diária</th>
+                                    <th className="text-right">Qtd Pessoas</th>
+                                    <th className="text-right">Dias/Mês</th>
+                                    <th className="text-right">Total</th>
+                                    <th className="w-10"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -352,15 +352,15 @@ export function FixedCosts() {
                                             />
                                         </td>
                                         <td className="py-2 text-right">
-                                            <input type="number" className="bg-dark-700 rounded border border-dark-600 w-20 text-right px-2 py-1 text-white"
+                                            <input type="number" className="input w-20 text-right py-1 h-8"
                                                 value={cost.config?.daily_rate || ''} onChange={e => updateFreightOrFreelancer(cost, 'daily_rate', parseFloat(e.target.value))} />
                                         </td>
                                         <td className="py-2 text-right">
-                                            <input type="number" className="bg-dark-700 rounded border border-dark-600 w-16 text-right px-2 py-1 text-white"
+                                            <input type="number" className="input w-16 text-right py-1 h-8"
                                                 value={cost.config?.qty_people || ''} onChange={e => updateFreightOrFreelancer(cost, 'qty_people', parseFloat(e.target.value))} />
                                         </td>
                                         <td className="py-2 text-right">
-                                            <input type="number" className="bg-dark-700 rounded border border-dark-600 w-16 text-right px-2 py-1 text-white"
+                                            <input type="number" className="input w-16 text-right py-1 h-8"
                                                 value={cost.config?.days_worked || ''} onChange={e => updateFreightOrFreelancer(cost, 'days_worked', parseFloat(e.target.value))} />
                                         </td>
                                         <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
@@ -399,15 +399,15 @@ export function FixedCosts() {
                         costs={costs.filter(c => c.category === 'Motoboys')}
                         totalValue={costs.filter(c => c.category === 'Motoboys').reduce((acc, c) => acc + c.monthly_value, 0)}
                     >
-                        <table className="w-full text-sm">
+                        <table className="data-table text-sm">
                             <thead>
-                                <tr className="text-slate-400 border-b border-dark-700 text-left">
-                                    <th className="pb-2 pl-2">Descrição</th>
-                                    <th className="pb-2 text-right">Diária Fixa</th>
-                                    <th className="pb-2 text-right">Qtd Motos</th>
-                                    <th className="pb-2 text-right">Dias/Mês</th>
-                                    <th className="pb-2 text-right">Total</th>
-                                    <th className="pb-2 w-10"></th>
+                                <tr>
+                                    <th className="pl-4">Descrição</th>
+                                    <th className="text-right">Diária Fixa</th>
+                                    <th className="text-right">Qtd Motos</th>
+                                    <th className="text-right">Dias/Mês</th>
+                                    <th className="text-right">Total</th>
+                                    <th className="w-10"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -421,15 +421,15 @@ export function FixedCosts() {
                                             />
                                         </td>
                                         <td className="py-2 text-right">
-                                            <input type="number" className="bg-dark-700 rounded border border-dark-600 w-20 text-right px-2 py-1 text-white"
+                                            <input type="number" className="input w-20 text-right py-1 h-8"
                                                 value={cost.config?.daily_rate || ''} onChange={e => updateFreightOrFreelancer(cost, 'daily_rate', parseFloat(e.target.value))} />
                                         </td>
                                         <td className="py-2 text-right">
-                                            <input type="number" className="bg-dark-700 rounded border border-dark-600 w-16 text-right px-2 py-1 text-white"
+                                            <input type="number" className="input w-16 text-right py-1 h-8"
                                                 value={cost.config?.qty_people || ''} onChange={e => updateFreightOrFreelancer(cost, 'qty_people', parseFloat(e.target.value))} />
                                         </td>
                                         <td className="py-2 text-right">
-                                            <input type="number" className="bg-dark-700 rounded border border-dark-600 w-16 text-right px-2 py-1 text-white"
+                                            <input type="number" className="input w-16 text-right py-1 h-8"
                                                 value={cost.config?.days_worked || ''} onChange={e => updateFreightOrFreelancer(cost, 'days_worked', parseFloat(e.target.value))} />
                                         </td>
                                         <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
@@ -468,14 +468,14 @@ export function FixedCosts() {
                         costs={costs.filter(c => c.category === 'Lanche' || c.category === 'Lanche Funcionário')}
                         totalValue={costs.filter(c => c.category === 'Lanche' || c.category === 'Lanche Funcionário').reduce((acc, c) => acc + c.monthly_value, 0)}
                     >
-                        <table className="w-full text-sm">
+                        <table className="data-table text-sm">
                             <thead>
-                                <tr className="text-slate-400 border-b border-dark-700 text-left">
-                                    <th className="pb-2 pl-2">Descrição / Produto</th>
-                                    <th className="pb-2 text-right">Custo Unit.</th>
-                                    <th className="pb-2 text-right">Dias/Mês</th>
-                                    <th className="pb-2 text-right">Total</th>
-                                    <th className="pb-2 w-10"></th>
+                                <tr>
+                                    <th className="pl-4">Descrição / Produto</th>
+                                    <th className="text-right">Custo Unit.</th>
+                                    <th className="text-right">Dias/Mês</th>
+                                    <th className="text-right">Total</th>
+                                    <th className="w-10"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -529,12 +529,12 @@ export function FixedCosts() {
                                             <td className="py-2 text-right">
                                                 {isProduct ?
                                                     <span className="text-slate-400">R$ {(cost.config?.unit_cost || 0).toFixed(2)}</span> :
-                                                    <input type="number" className="bg-dark-700 rounded border border-dark-600 w-20 text-right px-2 py-1 text-white"
+                                                    <input type="number" className="input w-20 text-right py-1 h-8"
                                                         value={cost.config?.unit_cost || ''} onChange={e => updateSnack(cost, 'manual', parseFloat(e.target.value), undefined, cost.config?.monthly_qty)} />
                                                 }
                                             </td>
                                             <td className="py-2 text-right">
-                                                <input type="number" className="bg-dark-700 rounded border border-dark-600 w-16 text-right px-2 py-1 text-white"
+                                                <input type="number" className="input w-16 text-right py-1 h-8"
                                                     value={cost.config?.monthly_qty || ''} onChange={e => updateSnack(cost, isProduct ? 'product' : 'manual', cost.config?.unit_cost, cost.config?.product_id, parseFloat(e.target.value))} />
                                             </td>
                                             <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
@@ -570,14 +570,14 @@ export function FixedCosts() {
             {activeTab === 'Despesas' && (
                 <div className="space-y-6">
                     {/* General/Other Table */}
-                    <div className="card bg-dark-800 border border-dark-700 rounded-lg p-4">
-                        <table className="w-full text-sm">
+                    <div className="glass-card overflow-hidden">
+                        <table className="data-table text-sm">
                             <thead>
-                                <tr className="text-slate-400 border-b border-dark-700 text-left">
-                                    <th className="pb-2 pl-2">Descrição</th>
-                                    <th className="pb-2">Categoria</th>
-                                    <th className="pb-2 text-right">Valor Mensal</th>
-                                    <th className="pb-2 w-10"></th>
+                                <tr>
+                                    <th className="pl-4">Descrição</th>
+                                    <th className="text-left">Categoria</th>
+                                    <th className="text-right">Valor Mensal</th>
+                                    <th className="w-10"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -606,7 +606,7 @@ export function FixedCosts() {
                                         <td className="py-2 text-right">
                                             <input
                                                 type="number"
-                                                className="bg-dark-700 rounded border border-dark-600 w-32 text-right px-2 py-1 text-white focus:border-emerald-500 outline-none"
+                                                className="input w-32 text-right py-1 h-8"
                                                 value={cost.monthly_value || ''}
                                                 onChange={e => handleUpdateCost(cost.id, { monthly_value: parseFloat(e.target.value) || 0 })}
                                             />
@@ -644,9 +644,9 @@ export function FixedCosts() {
 // Helper Component for Accordion Sections
 function CostSection({ title, icon: Icon, color, isOpen, onToggle, costs, totalValue, children }: any) {
     return (
-        <div className="card bg-dark-800 border border-dark-700 rounded-lg overflow-hidden transition-all duration-300">
+        <div className="glass-card overflow-hidden transition-all duration-300">
             <div
-                className={`p-4 ${isOpen ? 'bg-dark-900 border-b border-dark-700' : ''} flex justify-between items-center cursor-pointer hover:bg-dark-700/50 transition-colors`}
+                className={`p-4 ${isOpen ? 'bg-slate-800/50 border-b border-slate-700/50' : ''} flex justify-between items-center cursor-pointer hover:bg-slate-700/30 transition-colors`}
                 onClick={onToggle}
             >
                 <div className="flex items-center gap-3 text-lg font-bold text-slate-100">
@@ -663,7 +663,7 @@ function CostSection({ title, icon: Icon, color, isOpen, onToggle, costs, totalV
             </div>
 
             {isOpen && (
-                <div className="p-4 bg-dark-800/50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="p-4 bg-slate-900/20 animate-in fade-in slide-in-from-top-2 duration-200">
                     {costs.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8">
                             <EmptyState

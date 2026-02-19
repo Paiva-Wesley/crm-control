@@ -38,14 +38,14 @@ export function Login() {
         >
             <form className="space-y-6" onSubmit={handleLogin}>
                 {error && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm flex items-center gap-2">
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-md text-sm flex items-center gap-2">
                         <AlertCircle className="h-4 w-4" />
                         {error}
                     </div>
                 )}
 
                 <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                    <label htmlFor="email" className="label">
                         Email
                     </label>
                     <div className="mt-1">
@@ -57,13 +57,13 @@ export function Login() {
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 px-3 border"
+                            className="input"
                         />
                     </div>
                 </div>
 
                 <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+                    <label htmlFor="password" className="label">
                         Senha
                     </label>
                     <div className="mt-1">
@@ -75,14 +75,14 @@ export function Login() {
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 px-3 border"
+                            className="input"
                         />
                     </div>
                 </div>
 
                 <div className="flex items-center justify-between">
                     <div className="text-sm">
-                        <Link to="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
+                        <Link to="/forgot-password" className="font-medium text-primary hover:text-primary-light transition-colors">
                             Esqueceu sua senha?
                         </Link>
                     </div>
@@ -91,7 +91,7 @@ export function Login() {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn btn-primary w-full justify-center"
                 >
                     {loading ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
@@ -101,8 +101,8 @@ export function Login() {
                 </button>
 
                 <div className="text-center text-sm">
-                    <span className="text-slate-500">Não tem uma conta? </span>
-                    <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500">
+                    <span className="text-slate-400">Não tem uma conta? </span>
+                    <Link to="/signup" className="font-medium text-primary hover:text-primary-light transition-colors">
                         Começar teste grátis
                     </Link>
                 </div>

@@ -80,9 +80,11 @@ export function Dashboard() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-100">Dashboard</h2>
-                <p className="text-slate-400 mt-1">Visão geral do sistema de custos</p>
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Dashboard</h1>
+                    <p className="page-subtitle">Visão geral do sistema de custos</p>
+                </div>
             </div>
 
             <OnboardingChecklist />
@@ -91,22 +93,22 @@ export function Dashboard() {
                 {cards.map((card, index) => (
                     <div
                         key={index}
-                        className="bg-dark-800 border border-dark-700 rounded-lg p-6 hover:border-dark-600 transition-colors"
+                        className="glass-card p-6 flex flex-col justify-between hover:bg-slate-800/80 transition-all duration-300"
                     >
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-slate-400 mb-1">{card.title}</p>
-                                <p className="text-2xl font-bold text-slate-100">{card.value}</p>
-                            </div>
+                        <div className="flex items-center justify-between mb-4">
                             <div className={`p-3 rounded-lg ${card.bgColor}`}>
                                 <card.icon size={24} className={card.color} />
                             </div>
+                        </div>
+                        <div>
+                            <p className="text-sm text-slate-400 mb-1">{card.title}</p>
+                            <p className="text-3xl font-bold text-slate-100 tracking-tight">{card.value}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="bg-dark-800 border border-dark-700 rounded-lg p-6">
+            <div className="glass-card p-8">
                 <h3 className="text-lg font-semibold text-slate-100 mb-4">Bem-vindo ao CMV Control</h3>
                 <div className="space-y-4 text-slate-300">
                     <p>Sistema completo para gestão de custos e precificação de produtos.</p>

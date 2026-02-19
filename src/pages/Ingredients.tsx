@@ -330,10 +330,10 @@ export function Ingredients() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+            <div className="page-header">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Insumos</h1>
-                    <p className="text-slate-400 text-sm mt-1">
+                    <h1 className="page-title">Insumos</h1>
+                    <p className="page-subtitle">
                         Gerencie ingredientes, embalagens e acompanhamentos
                     </p>
                 </div>
@@ -352,6 +352,7 @@ export function Ingredients() {
                         }}
                         disabled={!subLoading && !checkLimit('ingredients')}
                         leftIcon={<Plus size={20} />}
+                        className="btn-primary"
                     >
                         Novo Insumo
                     </Button>
@@ -360,17 +361,17 @@ export function Ingredients() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="glass-card p-4">
                     <p className="text-sm text-slate-400">Total em {activeTab}s</p>
                     <p className="text-2xl font-bold text-white">{stats.count}</p>
                 </div>
-                <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="glass-card p-4">
                     <p className="text-sm text-slate-400">Custo Médio</p>
                     <p className="text-2xl font-bold text-emerald-400">
                         R$ {stats.avgCost.toFixed(2)}
                     </p>
                 </div>
-                <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="glass-card p-4">
                     <p className="text-sm text-slate-400">Soma dos Custos</p>
                     <p className="text-2xl font-bold text-blue-400">
                         R$ {stats.totalValue.toFixed(2)}
@@ -416,7 +417,7 @@ export function Ingredients() {
             </div>
 
             {/* Table */}
-            <div className="bg-dark-800 border border-dark-700 rounded-lg overflow-hidden">
+            <div className="glass-card overflow-hidden">
                 {filteredIngredients.length === 0 && !loading ? (
                     <EmptyState
                         icon={Utensils}
@@ -432,20 +433,20 @@ export function Ingredients() {
                     />
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="data-table">
                             <thead>
-                                <tr className="border-b border-dark-700">
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Nome</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Tipo</th>
-                                    <th className="px-4 py-3 text-center text-sm font-medium text-slate-400 uppercase tracking-wider">Unidade</th>
-                                    <th className="px-4 py-3 text-right text-sm font-medium text-slate-400 uppercase tracking-wider">Custo Unit.</th>
-                                    <th className="px-4 py-3 text-right text-sm font-medium text-slate-400 uppercase tracking-wider">Custo/100g ou un</th>
-                                    <th className="px-4 py-3 text-right text-sm font-medium text-slate-400 uppercase tracking-wider">Ações</th>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Tipo</th>
+                                    <th className="text-center">Unidade</th>
+                                    <th className="text-right">Custo Unit.</th>
+                                    <th className="text-right">Custo/100g ou un</th>
+                                    <th className="text-right">Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>
+                                    <tr><td colSpan={6} className="text-center text-slate-400 py-8">Carregando...</td></tr>
                                 ) : (
                                     filteredIngredients.map(ing => {
                                         const normalizedCost = ing.unit === 'kg'
@@ -455,8 +456,8 @@ export function Ingredients() {
                                                 : ing.cost_per_unit;
 
                                         return (
-                                            <tr key={ing.id} className="border-b border-dark-700 hover:bg-dark-700/50 transition-colors">
-                                                <td className="px-4 py-4">
+                                            <tr key={ing.id} className="hover:bg-slate-700/20 transition-colors">
+                                                <td>
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-semibold text-slate-100">{ing.name}</p>
                                                         {ing.is_composite && (
@@ -467,20 +468,20 @@ export function Ingredients() {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-4">
+                                                <td>
                                                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
                                                         {ing.category || 'Insumo'}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-4 text-center">
+                                                <td className="text-center">
                                                     <span className="px-2 py-1 bg-dark-700 rounded text-sm text-slate-300">
                                                         {ing.unit}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-4 text-right text-slate-300">
+                                                <td className="text-right text-slate-300">
                                                     R$ {Number(ing.cost_per_unit).toFixed(4)}
                                                 </td>
-                                                <td className="px-4 py-4 text-right">
+                                                <td className="text-right">
                                                     <span className="text-emerald-400">
                                                         R$ {normalizedCost.toFixed(4)}
                                                     </span>
@@ -488,8 +489,8 @@ export function Ingredients() {
                                                         /{ing.unit === 'kg' || ing.unit === 'g' ? '100g' : 'un'}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-4 text-right">
-                                                    <div className="flex justify-end gap-2">
+                                                <td className="text-right">
+                                                    <div className="flex justify-end gap-2 text-right">
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"

@@ -75,15 +75,10 @@ export function Products() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-                <div className="search-box w-full sm:w-96">
-                    <Search size={20} className="text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar produtos..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Ficha Técnica</h1>
+                    <p className="page-subtitle">Gerencie os produtos finais vendidos aos clientes.</p>
                 </div>
                 <div className="flex gap-2">
                     {!subLoading && !checkLimit('products') && (
@@ -100,14 +95,27 @@ export function Products() {
                         }}
                         disabled={!subLoading && !checkLimit('products')}
                         leftIcon={<Plus size={20} />}
+                        className="btn-primary"
                     >
                         Novo Produto
                     </Button>
                 </div>
             </div>
 
+            <div className="flex gap-4 mb-6">
+                <div className="search-box w-full sm:w-96">
+                    <Search size={20} className="text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Buscar produtos..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+
             {/* Table */}
-            <div className="bg-dark-800 border border-dark-700 rounded-lg overflow-hidden">
+            <div className="glass-card overflow-hidden">
                 {filteredProducts.length === 0 && !loading ? (
                     <EmptyState
                         icon={Package}
@@ -123,33 +131,33 @@ export function Products() {
                     />
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="data-table">
                             <thead>
-                                <tr className="border-b border-dark-700">
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Produto</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Categoria</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Preço Venda</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">CMV</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">CMV %</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400 uppercase tracking-wider">Lucro Estimado</th>
-                                    <th className="px-4 py-3 text-right text-sm font-medium text-slate-400 uppercase tracking-wider">Ações</th>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Categoria</th>
+                                    <th>Preço Venda</th>
+                                    <th>CMV</th>
+                                    <th>CMV %</th>
+                                    <th>Lucro Estimado</th>
+                                    <th className="text-right">Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>
+                                    <tr><td colSpan={7} className="text-center text-slate-400 py-8">Carregando...</td></tr>
                                 ) : (
                                     filteredProducts.map(prod => (
                                         <tr
                                             key={prod.id}
-                                            className="border-b border-dark-700 hover:bg-dark-700/50 transition-colors cursor-pointer"
+                                            className="cursor-pointer transition-colors hover:bg-slate-700/20"
                                             style={{ opacity: prod.active ? 1 : 0.5 }}
                                             onClick={() => handleEdit(prod)}
                                         >
-                                            <td className="px-4 py-4 font-semibold text-slate-100">{prod.name}</td>
-                                            <td className="px-4 py-4 text-slate-300">{prod.category || '-'}</td>
-                                            <td className="px-4 py-4 text-slate-300">R$ {Number(prod.sale_price).toFixed(2)}</td>
-                                            <td className="px-4 py-4 text-slate-400">R$ {Number(prod.cmv).toFixed(2)}</td>
+                                            <td className="font-semibold text-slate-100">{prod.name}</td>
+                                            <td>{prod.category || '-'}</td>
+                                            <td>R$ {Number(prod.sale_price).toFixed(2)}</td>
+                                            <td className="text-slate-400">R$ {Number(prod.cmv).toFixed(2)}</td>
                                             {/* CMV % and Lucro Estimado via pricing engine */}
                                             {(() => {
                                                 const price = Number(prod.sale_price) || 0;
@@ -175,12 +183,12 @@ export function Products() {
                                                 const profitColor = m.profitValue > 0 ? 'text-emerald-400' : 'text-red-400';
                                                 return (
                                                     <>
-                                                        <td className="px-4 py-4">
+                                                        <td>
                                                             <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${cmvBg} ${cmvColor}`}>
                                                                 {cmvPct.toFixed(1)}%
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-4">
+                                                        <td>
                                                             <span className={`font-semibold ${profitColor}`}>
                                                                 R$ {m.profitValue.toFixed(2)}
                                                             </span>
@@ -191,7 +199,7 @@ export function Products() {
                                                     </>
                                                 );
                                             })()}
-                                            <td className="px-4 py-4 text-right" onClick={e => e.stopPropagation()}>
+                                            <td className="text-right" onClick={e => e.stopPropagation()}>
                                                 <Button
                                                     variant="danger"
                                                     size="sm"

@@ -33,9 +33,9 @@ export function Plans() {
 
     return (
         <div className="space-y-8">
-            <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold text-slate-100">Planos e Preços</h2>
-                <p className="text-slate-400">Escolha o plano ideal para o crescimento do seu negócio</p>
+            <div className="page-header justify-center text-center flex-col items-center">
+                <h2 className="page-title text-4xl mb-4">Planos e Preços</h2>
+                <p className="page-subtitle text-lg">Escolha o plano ideal para o crescimento do seu negócio</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -57,35 +57,35 @@ export function Plans() {
                         <div
                             key={plan.id}
                             className={`
-                                relative p-6 rounded-2xl border transition-all duration-300
+                                relative p-8 rounded-2xl border transition-all duration-300 glass-card
                                 ${isCurrent
-                                    ? 'bg-dark-800 border-primary shadow-lg shadow-primary/10 scale-105 z-10'
-                                    : 'bg-dark-800/50 border-dark-700 hover:border-dark-600'
+                                    ? 'bg-slate-800/80 border-primary shadow-lg shadow-primary/20 scale-105 z-10'
+                                    : 'hover:border-slate-600/50 hover:bg-slate-800/60'
                                 }
                             `}
                         >
                             {isCurrent && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-                                    PLANO ATUAL
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-primary/30 tracking-wide uppercase">
+                                    Plano Atual
                                 </div>
                             )}
 
-                            <div className="text-center mb-6">
-                                <h3 className="text-xl font-bold text-slate-100 mb-2">{plan.name}</h3>
+                            <div className="text-center mb-8 border-b border-slate-700/50 pb-8">
+                                <h3 className="text-xl font-bold text-slate-100 mb-4">{plan.name}</h3>
                                 <div className="flex justify-center items-baseline gap-1">
-                                    <span className="text-sm text-slate-400 align-top">R$</span>
-                                    <span className="text-4xl font-extrabold text-white">{plan.price.toFixed(2)}</span>
-                                    <span className="text-slate-500">/mês</span>
+                                    <span className="text-sm text-slate-400 align-top font-medium mt-2">R$</span>
+                                    <span className="text-5xl font-extrabold text-white tracking-tight">{plan.price.toFixed(2)}</span>
+                                    <span className="text-slate-500 font-medium">/mês</span>
                                 </div>
                             </div>
 
                             <div className="space-y-4 mb-8">
                                 {features.map((feature, idx) => (
                                     <div key={idx} className="flex items-start gap-3">
-                                        <div className="mt-1 bg-emerald-500/10 p-1 rounded-full">
-                                            <Check size={12} className="text-emerald-500" />
+                                        <div className="mt-1 bg-emerald-500/10 p-1 rounded-full shrink-0">
+                                            <Check size={14} className="text-emerald-500" />
                                         </div>
-                                        <span className="text-sm text-slate-300">{feature}</span>
+                                        <span className="text-sm text-slate-300 leading-relaxed">{feature}</span>
                                     </div>
                                 ))}
                             </div>
@@ -94,10 +94,10 @@ export function Plans() {
                                 onClick={() => !isCurrent && handleUpgrade(plan)}
                                 disabled={isCurrent}
                                 className={`
-                                    w-full py-3 px-4 rounded-xl font-bold transition-all
+                                    w-full py-4 px-6 rounded-xl font-bold transition-all text-sm uppercase tracking-wide
                                     ${isCurrent
-                                        ? 'bg-dark-700 text-slate-500 cursor-default'
-                                        : 'bg-primary hover:bg-primary-dark text-white hover:scale-[1.02]'
+                                        ? 'bg-slate-800 text-slate-500 cursor-default border border-slate-700'
+                                        : 'btn-primary hover:scale-[1.02] shadow-lg shadow-primary/20'
                                     }
                                 `}
                             >

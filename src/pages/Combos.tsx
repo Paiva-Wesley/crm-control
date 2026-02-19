@@ -61,14 +61,7 @@ export function Combos() {
         }
     }
 
-    // Settings are now loaded via useBusinessSettings hook
-
     async function fetchComboItems(comboId: number) {
-        // We need to fetch the child product details (especially CMV/cost)
-        // Since product_combos links to products, we can join with product_costs_view to get costs easily.
-        // However, product_costs_view is a view, and joining a table (product_combos) with a view might need explicit query.
-
-        // Let's fetch the combo items first
         const { data: items, error } = await supabase
             .from('product_combos')
             .select(`
@@ -82,8 +75,6 @@ export function Combos() {
             return;
         }
 
-        // Now for each item, we want its cost. The 'child_product' relation gives simple product data.
-        // We need the collected CMV from the view for accurate costing.
         const { data: costs } = await supabase.from('product_costs_view').select('id, cmv');
         const costMap = new Map(costs?.map(c => [c.id, c]) || []);
 
@@ -108,7 +99,7 @@ export function Combos() {
         }
 
         const { data } = await supabase
-            .from('product_costs_view') // Search in view to get costs directly
+            .from('product_costs_view')
             .select('*')
             .ilike('name', `%${term}%`)
             .eq('is_combo', false)
@@ -142,10 +133,8 @@ export function Combos() {
             }
 
             // 2. Sync Items
-            // Delete existing
             await supabase.from('product_combos').delete().eq('parent_product_id', comboId);
 
-            // Insert new
             const itemsToInsert = comboItems.map(item => ({
                 parent_product_id: comboId,
                 child_product_id: item.child_product_id,
@@ -158,9 +147,8 @@ export function Combos() {
                 if (itemsError) throw itemsError;
             }
 
-            // Refresh
             fetchCombos();
-            setSelectedCombo(null); // Return to list
+            setSelectedCombo(null);
             alert('Combo salvo com sucesso!');
 
         } catch (err) {
@@ -186,7 +174,7 @@ export function Combos() {
             ));
         } else {
             setComboItems(items => [...items, {
-                id: 0, // temp
+                id: 0,
                 parent_product_id: selectedCombo?.id || 0,
                 child_product_id: product.id,
                 quantity: 1,
@@ -222,7 +210,7 @@ export function Combos() {
         return acc + ((item.child_product?.sale_price || 0) * item.quantity);
     }, 0);
 
-    // Pricing Logic (via pricing engine)
+    // Pricing Logic
     const suggestedPriceMarkup = computeIdealMenuPrice(totalCMV, biz.markup);
     const channelPrices = computeAllChannelPrices(comboPrice > 0 ? comboPrice : suggestedPriceMarkup, biz.channels);
 
@@ -230,12 +218,15 @@ export function Combos() {
     const discountPercent = totalFullPrice > 0 ? (discountValue / totalFullPrice) * 100 : 0;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-                    <Layers className="text-primary" />
-                    Fichas Técnicas de Combos
-                </h2>
+        <div className="space-y-6 fade-in">
+            <div className="page-header">
+                <div>
+                    <h2 className="page-title flex items-center gap-2">
+                        <Layers className="text-primary" />
+                        Fichas Técnicas de Combos
+                    </h2>
+                    <p className="page-subtitle">Crie combinações de produtos e defina preços promocionais</p>
+                </div>
                 <button
                     onClick={() => {
                         setSelectedCombo({ id: 0, name: 'Novo Combo', sale_price: 0 } as any);
@@ -255,9 +246,9 @@ export function Combos() {
                         <div
                             key={combo.id}
                             onClick={() => setSelectedCombo(combo)}
-                            className={`p-4 rounded-lg border cursor-pointer transition-all ${selectedCombo?.id === combo.id
-                                ? 'bg-primary/20 border-primary'
-                                : 'bg-dark-800 border-dark-700 hover:border-slate-500'
+                            className={`glass-card p-4 cursor-pointer transition-all hover:border-slate-500 ${selectedCombo?.id === combo.id
+                                ? 'ring-2 ring-primary border-transparent bg-slate-800/80'
+                                : ''
                                 }`}
                         >
                             <div className="flex justify-between items-start">
@@ -267,33 +258,34 @@ export function Combos() {
                                         Venda: <span className="text-emerald-400 font-bold">R$ {combo.sale_price.toFixed(2)}</span>
                                     </div>
                                 </div>
-                                <Trash2
-                                    size={16}
-                                    className="text-slate-600 hover:text-red-500 z-10"
+                                <button
+                                    className="text-slate-600 hover:text-red-500 z-10 p-1 rounded hover:bg-slate-700/50 transition-colors"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteCombo(combo.id);
                                     }}
-                                />
+                                >
+                                    <Trash2 size={16} />
+                                </button>
                             </div>
                         </div>
                     ))}
                     {combos.length === 0 && !loading && (
-                        <div className="text-center text-slate-500 py-8">Nenhum combo cadastrado.</div>
+                        <div className="text-center text-slate-500 py-8 glass-card">Nenhum combo cadastrado.</div>
                     )}
                 </div>
 
                 {/* EDITOR */}
                 <div className="lg:col-span-2">
                     {selectedCombo ? (
-                        <div className="bg-dark-800 border border-dark-700 rounded-lg p-6 space-y-6">
+                        <div className="glass-card p-6 space-y-6">
 
                             {/* HEADER DO EDITOR */}
-                            <div className="flex gap-4 border-b border-dark-700 pb-6">
+                            <div className="flex gap-4 border-b border-slate-700/50 pb-6">
                                 <div className="flex-1">
                                     <label className="block text-sm text-slate-400 mb-1">Nome do Combo</label>
                                     <input
-                                        className="input w-full"
+                                        className="input w-full bg-slate-900/50 border-slate-700 focus:border-primary"
                                         value={comboName}
                                         onChange={e => setComboName(e.target.value)}
                                         placeholder="Ex: Combo Kids"
@@ -303,7 +295,7 @@ export function Combos() {
                                     <label className="block text-sm text-emerald-500 mb-1 font-bold">Preço Venda</label>
                                     <input
                                         type="number"
-                                        className="input w-full border-emerald-500/50 focus:border-emerald-500"
+                                        className="input w-full bg-slate-900/50 border-emerald-500/30 focus:border-emerald-500 text-emerald-400 font-bold"
                                         value={comboPrice}
                                         onChange={e => setComboPrice(Number(e.target.value))}
                                     />
@@ -316,18 +308,18 @@ export function Combos() {
                                     <h3 className="font-bold text-slate-200">Itens do Combo</h3>
                                     <div className="relative">
                                         <button
-                                            className="btn btn-sm btn-outline flex gap-2"
+                                            className="btn btn-sm btn-secondary flex gap-2"
                                             onClick={() => setShowSearch(!showSearch)}
                                         >
                                             <Plus size={16} /> Adicionar Produto
                                         </button>
 
                                         {showSearch && (
-                                            <div className="absolute right-0 top-10 w-72 bg-dark-900 border border-dark-700 shadow-xl rounded-lg p-2 z-50">
-                                                <div className="flex items-center gap-2 bg-dark-800 rounded px-2 border border-dark-700 mb-2">
+                                            <div className="absolute right-0 top-10 w-72 bg-slate-800 border border-slate-700 shadow-xl rounded-lg p-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="flex items-center gap-2 bg-slate-900/50 rounded px-2 border border-slate-700 mb-2">
                                                     <Search size={14} className="text-slate-400" />
                                                     <input
-                                                        className="bg-transparent border-none text-sm py-2 ml-1 w-full focus:ring-0"
+                                                        className="bg-transparent border-none text-sm py-2 ml-1 w-full focus:ring-0 text-slate-200 placeholder:text-slate-500"
                                                         placeholder="Buscar produto..."
                                                         autoFocus
                                                         value={searchTerm}
@@ -337,11 +329,11 @@ export function Combos() {
                                                         }}
                                                     />
                                                 </div>
-                                                <div className="max-h-48 overflow-y-auto space-y-1">
+                                                <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar">
                                                     {searchResults.map(p => (
                                                         <div
                                                             key={p.id}
-                                                            className="text-sm p-2 hover:bg-dark-700 cursor-pointer rounded flex justify-between"
+                                                            className="text-sm p-2 hover:bg-slate-700 cursor-pointer rounded flex justify-between text-slate-300"
                                                             onClick={() => addItem(p)}
                                                         >
                                                             <span>{p.name}</span>
@@ -354,77 +346,79 @@ export function Combos() {
                                     </div>
                                 </div>
 
-                                <table className="w-full text-sm">
-                                    <thead className="bg-dark-900/50 text-slate-400">
-                                        <tr>
-                                            <th className="p-3 text-left rounded-l">Item</th>
-                                            <th className="p-3 text-center">Qtd</th>
-                                            <th className="p-3 text-right">Custo Unit</th>
-                                            <th className="p-3 text-right">Preço Venda</th>
-                                            <th className="p-3 text-center rounded-r">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-dark-700">
-                                        {comboItems.map(item => {
-                                            const cost = (item.child_product as any).cmv || (item.child_product as any).cost_price || 0;
-                                            const price = item.child_product?.sale_price || 0;
+                                <div className="overflow-hidden rounded-lg border border-slate-700/50">
+                                    <table className="data-table text-sm">
+                                        <thead>
+                                            <tr>
+                                                <th className="pl-4">Item</th>
+                                                <th className="text-center">Qtd</th>
+                                                <th className="text-right">Custo Unit</th>
+                                                <th className="text-right">Preço Venda</th>
+                                                <th className="text-center pr-4">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {comboItems.map(item => {
+                                                const cost = (item.child_product as any).cmv || (item.child_product as any).cost_price || 0;
+                                                const price = item.child_product?.sale_price || 0;
 
-                                            return (
-                                                <tr key={item.child_product_id}>
-                                                    <td className="p-3 font-medium">{item.child_product?.name}</td>
-                                                    <td className="p-3 text-center">
-                                                        <input
-                                                            type="number"
-                                                            className="w-16 bg-dark-900 border border-dark-700 rounded text-center"
-                                                            value={item.quantity}
-                                                            onChange={e => updateItemQty(item.child_product_id, Number(e.target.value))}
-                                                        />
-                                                    </td>
-                                                    <td className="p-3 text-right text-amber-500">R$ {cost.toFixed(2)}</td>
-                                                    <td className="p-3 text-right text-slate-300">R$ {price.toFixed(2)}</td>
-                                                    <td className="p-3 text-center">
-                                                        <button
-                                                            onClick={() => removeItem(item.child_product_id)}
-                                                            className="text-slate-500 hover:text-red-500"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                return (
+                                                    <tr key={item.child_product_id} className="hover:bg-slate-700/20">
+                                                        <td className="pl-4 font-medium text-slate-200">{item.child_product?.name}</td>
+                                                        <td className="text-center">
+                                                            <input
+                                                                type="number"
+                                                                className="w-16 bg-slate-900/50 border border-slate-700 rounded text-center py-1 text-slate-200 focus:border-primary focus:ring-1 focus:ring-primary"
+                                                                value={item.quantity}
+                                                                onChange={e => updateItemQty(item.child_product_id, Number(e.target.value))}
+                                                            />
+                                                        </td>
+                                                        <td className="text-right text-amber-500">R$ {cost.toFixed(2)}</td>
+                                                        <td className="text-right text-slate-300">R$ {price.toFixed(2)}</td>
+                                                        <td className="text-center pr-4">
+                                                            <button
+                                                                onClick={() => removeItem(item.child_product_id)}
+                                                                className="text-slate-500 hover:text-red-500 transition-colors"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {comboItems.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="p-8 text-center text-slate-500">
+                                                        Adicione itens ao combo para começar
                                                     </td>
                                                 </tr>
-                                            );
-                                        })}
-                                        {comboItems.length === 0 && (
-                                            <tr>
-                                                <td colSpan={5} className="p-8 text-center text-slate-500 border-2 border-dashed border-dark-700 rounded">
-                                                    Adicione itens ao combo para começar
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
 
                             {/* RESUMO PRECIFICAÇÃO */}
-                            <div className="bg-dark-900/50 rounded-lg p-4 border border-dark-700">
+                            <div className="bg-slate-800/30 rounded-lg p-5 border border-slate-700/50">
                                 <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2">
                                     <Calculator className="text-secondary" size={18} />
                                     Resumo Precificação
                                 </h3>
 
                                 <div className="space-y-3 text-sm">
-                                    <div className="flex justify-between py-2 border-b border-dark-700">
+                                    <div className="flex justify-between py-2 border-b border-slate-700/50">
                                         <span className="text-slate-400">Custo dos Produtos (CMV)</span>
                                         <span className="font-bold text-amber-500">R$ {totalCMV.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between py-2 border-b border-dark-700">
+                                    <div className="flex justify-between py-2 border-b border-slate-700/50">
                                         <span className="text-slate-400">Preço Sugerido (Markup {biz.markup > 0 ? biz.markup.toFixed(2) + 'x' : 'N/A'})</span>
                                         <span className="font-bold text-slate-200">R$ {suggestedPriceMarkup.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between py-2 border-b border-dark-700">
+                                    <div className="flex justify-between py-2 border-b border-slate-700/50">
                                         <span className="text-slate-400">Preço Original (Soma Itens)</span>
                                         <span className="text-slate-300">R$ {totalFullPrice.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between py-2 border-b border-dark-700">
+                                    <div className="flex justify-between py-2 border-b border-slate-700/50">
                                         <span className="text-slate-400">Desconto Aplicado</span>
                                         <span className="font-bold text-emerald-400">
                                             {discountPercent.toFixed(1)}% (R$ {discountValue.toFixed(2)})
@@ -434,7 +428,7 @@ export function Combos() {
                                         <>
                                             <div className="text-xs text-blue-400 font-medium pt-2">Preço por Canal de Venda:</div>
                                             {channelPrices.map(cp => (
-                                                <div key={cp.channelId} className="flex justify-between py-1 px-2 bg-blue-500/5 rounded">
+                                                <div key={cp.channelId} className="flex justify-between py-1.5 px-3 bg-blue-500/5 rounded border border-blue-500/10 mb-1 last:mb-0">
                                                     <span className="text-slate-400">{cp.channelName} <span className="text-xs text-slate-500">({cp.totalTaxRate.toFixed(1)}%)</span></span>
                                                     <span className="font-bold text-blue-400">R$ {cp.idealPrice.toFixed(2)}</span>
                                                 </div>
@@ -453,9 +447,10 @@ export function Combos() {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-dark-700 rounded-lg bg-dark-800/50">
-                            <Layers size={48} className="mb-4 opacity-50" />
-                            <p>Selecione um combo ou crie um novo</p>
+                        <div className="h-full flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-xl bg-slate-800/20 p-12 glass-card">
+                            <Layers size={48} className="mb-4 opacity-30" />
+                            <p className="text-lg font-medium">Selecione um combo ou crie um novo</p>
+                            <p className="text-sm opacity-60">Gerencie seus combos e promoções aqui</p>
                         </div>
                     )}
                 </div>
