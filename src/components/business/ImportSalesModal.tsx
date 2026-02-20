@@ -27,11 +27,11 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
     const [step, setStep] = useState<'input' | 'preview'>('input');
     const [loading, setLoading] = useState(false);
 
-    // Helpers to parse Brazilian currency/numbers
+    // Helpers to parse Brazilian currency/numbers (Robust)
     function parseBRL(value: string): number {
         if (!value) return 0;
-        // Remove currency symbol, dots, and replace comma with dot
-        const clean = value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+        // Remove currency symbol, spaces, remove dots (thousands), replace comma with dot
+        const clean = value.replace('R$', '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.').trim();
         return parseFloat(clean) || 0;
     }
 
@@ -53,39 +53,93 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
             const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
             const productMap = new Map(products.map(p => [normalize(p.name), p.id]));
 
-            const lines = rawText.split('\n');
+            const lines = rawText.split('\n').filter(l => l.trim().length > 0);
             const parsed: ParsedItem[] = [];
 
-            const startIndex = lines[0].toLowerCase().includes('produto') ? 1 : 0;
+            // --- Header Detection & Dynamic Mapping ---
+            // Default indices (Standard: Product | Category | Qty | Total | Avg)
+            let idxProduct = 0;
+            let idxCategory = 1;
+            let idxQty = 2;
+            let idxTotal = 3;
+            let idxAvg = 4;
 
-            for (let i = startIndex; i < lines.length; i++) {
+            let dataStartIndex = 0;
+
+            // Normalize helper for headers
+            const normHeader = (h: string) => h.toLowerCase().trim()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+                .replace(/[^a-z0-9]/g, ""); // remove special chars
+
+            // Try to find header line
+            const headerLineIndex = lines.findIndex(line => {
+                const lower = normHeader(line);
+                return lower.includes('produto') && (lower.includes('qtd') || lower.includes('quantidade'));
+            });
+
+            if (headerLineIndex !== -1) {
+                const headers = lines[headerLineIndex].split('\t').map(normHeader);
+
+                // Reset indices to -1 to ensure we only use found ones
+                idxProduct = -1; idxTotal = -1; idxAvg = -1; idxQty = -1; idxCategory = -1;
+
+                headers.forEach((h, i) => {
+                    if (h.includes('produto')) idxProduct = i;
+                    else if (h.includes('categoria')) idxCategory = i;
+                    else if (h.includes('faturamento') || h === 'total' || h.includes('tot') || h.includes('valor')) idxTotal = i;
+                    else if (h.includes('medio') || h.includes('unitario') || h.includes('preco')) idxAvg = i;
+                    else if (h.includes('qtd') || h.includes('quant')) idxQty = i;
+                });
+
+                // If critical columns not found, revert to defaults or warn? 
+                // Let's fallback to standard if we can't find Product/Qty (revert to default)
+                if (idxProduct === -1 || idxQty === -1) {
+                    console.warn('Could not identify columns by name, using default positions.');
+                    idxProduct = 0; idxCategory = 1; idxQty = 2; idxTotal = 3; idxAvg = 4;
+                } else {
+                    dataStartIndex = headerLineIndex + 1;
+                }
+            }
+
+            for (let i = dataStartIndex; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
 
                 const cols = line.split('\t');
-                if (cols.length < 5) continue;
+                const maxIdx = Math.max(idxProduct, idxCategory, idxQty, idxTotal, idxAvg);
+                if (cols.length <= maxIdx && maxIdx < 5) {
+                    // if line is too short but we are using default logic, skip
+                }
 
-                const name = cols[0].trim();
-                const category = cols[1].trim();
-                const qty = parseQty(cols[2]);
-                const total = parseBRL(cols[3]);
-                const avgPrice = parseBRL(cols[4]);
+                const name = cols[idxProduct]?.trim();
+                // Filter out header row if logic failed to skip it, or 'Total' row
+                if (!name || name === 'Total' || normHeader(name) === 'produto') continue;
 
-                if (!name || name === 'Total') continue;
+                const category = idxCategory !== -1 ? cols[idxCategory]?.trim() : '';
+                const qty = idxQty !== -1 ? parseQty(cols[idxQty]) : 0;
+
+                let total = (idxTotal !== -1 && cols[idxTotal]) ? parseBRL(cols[idxTotal]) : 0;
+                let avgPrice = (idxAvg !== -1 && cols[idxAvg]) ? parseBRL(cols[idxAvg]) : 0;
+
+                // Calculation Fallbacks
+                if (total === 0 && avgPrice > 0 && qty > 0) {
+                    total = qty * avgPrice;
+                }
+                if (avgPrice === 0 && total > 0 && qty > 0) {
+                    avgPrice = total / qty;
+                }
 
                 // Check existence using normalized name
                 const normName = normalize(name);
                 let existingId = productMap.get(normName);
                 if (!existingId) {
-                    // Try finding by stripping trailing 's' from import name
                     if (normName.endsWith('s')) existingId = productMap.get(normName.slice(0, -1));
                 }
 
                 let isCombo = false;
                 let comboItems: { childId: number; qty: number; name: string }[] = [];
 
-                // Logic: NEW combos only
-                if (category.toLowerCase().includes('combo') && !existingId) {
+                if (category && category.toLowerCase().includes('combo') && !existingId) {
                     isCombo = true;
                     // Regex split by comma or " e " (case insensitive)
                     const parts = name.split(/,| e /i);
@@ -202,7 +256,7 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
             isOpen={isOpen}
             onClose={onClose}
             title={step === 'input' ? 'Importar Dados de Venda' : 'Confirmar Importação'}
-            maxWidth="800px"
+            maxWidth="900px"
         >
             <div className="space-y-4">
                 {step === 'input' ? (
@@ -212,14 +266,14 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                             <div>
                                 <p className="font-bold mb-1">Como importar?</p>
                                 <p>1. No seu sistema de vendas, gere o relatório de produtos vendidos.</p>
-                                <p>2. Copie as colunas (Ctrl+C) na ordem: <strong>Produto | Categoria | Qtd Vendida | Faturamento | Preço Médio</strong></p>
+                                <p>2. Copie as colunas (Ctrl+C) na ordem: <strong>Produto | Categoria | Qtd Vendida | Faturamento | Preço Médio (Opcional)</strong></p>
                                 <p>3. Cole (Ctrl+V) no campo abaixo.</p>
                             </div>
                         </div>
 
                         <textarea
                             className="w-full h-64 bg-dark-700 border border-dark-600 rounded-lg p-4 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none"
-                            placeholder={"Produto\tCategoria\tQtd\tTotal\tMédio\nX-Tudo\tLanches\t65\tR$ 2.024,88\tR$ 30,68..."}
+                            placeholder={"Produto\\tCategoria\\tQtd\\tTotal\\tMédio\\nX-Tudo\\tLanches\\t65\\tR$ 2.024,88\\tR$ 30,68..."}
                             value={rawText}
                             onChange={e => setRawText(e.target.value)}
                         />
@@ -256,6 +310,7 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                                         <th className="px-4 py-2 text-left">Produto</th>
                                         <th className="px-4 py-2 text-left">Categoria</th>
                                         <th className="px-4 py-2 text-right">Qtd</th>
+                                        <th className="px-4 py-2 text-right">Faturamento</th>
                                         <th className="px-4 py-2 text-right">Médio</th>
                                     </tr>
                                 </thead>
@@ -287,6 +342,7 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                                             </td>
                                             <td className="px-4 py-2 text-slate-400">{item.category}</td>
                                             <td className="px-4 py-2 text-right">{item.qty}</td>
+                                            <td className="px-4 py-2 text-right">R$ {item.total.toFixed(2)}</td>
                                             <td className="px-4 py-2 text-right">R$ {item.avgPrice.toFixed(2)}</td>
                                         </tr>
                                     ))}
