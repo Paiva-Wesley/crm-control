@@ -9,6 +9,9 @@ export interface Product {
     category?: string;
     is_combo?: boolean;
     company_id?: number;
+    last_sales_qty?: number;
+    last_sales_total?: number;
+    average_sale_price?: number;
 }
 
 export interface Ingredient {

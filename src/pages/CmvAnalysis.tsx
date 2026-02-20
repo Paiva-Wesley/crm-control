@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
-    PieChart, Activity, TrendingUp, DollarSign, AlertCircle, ArrowDown, ArrowUp, BarChart3, AlertTriangle
+    PieChart, TrendingUp, DollarSign, BarChart3, AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { ProductWithCost } from '../types';
 
-interface ProductWithMetrics extends ProductWithCost {
+interface ProductWithMetrics extends Omit<ProductWithCost, 'cmv'> {
     last_sales_qty: number;
     last_sales_total: number;
     // Calculated fields
@@ -14,7 +14,7 @@ interface ProductWithMetrics extends ProductWithCost {
     cost?: number; // total cmv cost
     grossProfit?: number; // revenue - cost
     margin?: number; // %
-    cmv?: number; // % (or unit cmv? logic says unit cmv in types usually, but let's be careful)
+    cmv: number; // % (Overwriting base cmv which is unit cost)
     status?: string;
 }
 
@@ -25,7 +25,7 @@ export function CmvAnalysis() {
 
     // Data State
     const [products, setProducts] = useState<ProductWithMetrics[]>([]);
-    const [fixedCostsTotal, setFixedCostsTotal] = useState(0);
+
     const [variableRateTotal, setVariableRateTotal] = useState(0); // Tax %
     const [platformTaxRate, setPlatformTaxRate] = useState(0);
 
@@ -37,13 +37,20 @@ export function CmvAnalysis() {
         try {
             setLoading(true);
 
-            // 1. Fetch Products with Costs
+            // 1. Fetch Products with Costs (View might be outdated regarding sales columns)
             const { data: prods } = await supabase
                 .from('product_costs_view')
                 .select('*')
                 .order('name');
 
-            // 2. Fetch Sales Data
+            // 1b. Fetch Direct Product Sales Data (Source of Truth for Imported Sales)
+            const { data: productRealSales } = await supabase
+                .from('products')
+                .select('id, last_sales_qty, last_sales_total, average_sale_price');
+
+            const realSalesMap = new Map(productRealSales?.map(p => [p.id, p]));
+
+            // 2. Fetch Sales Data (Legacy/Detailed)
             // In a real scenario, use dateRange to filter
             const { data: sales } = await supabase.from('sales').select('product_id, quantity, sale_price');
 
@@ -60,42 +67,38 @@ export function CmvAnalysis() {
             // 4. Merge Data
             const productsWithMetrics = (prods || []).map(p => {
                 const salesData = salesMap.get(p.id) || { qty: 0, total: 0 };
-                const revenue = salesData.total; // or salesData.qty * p.sale_price if total unavailable
-                const totalCmv = salesData.qty * (p.cmv || 0);
-                const grossProfit = revenue - totalCmv; // Simplified for product level
-                const margin = revenue > 0 ? grossProfit : 0; // Absolute value? No, margin usually % or value? JSX uses margin as value R$
-                const marginPercent = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+                const directSales = realSalesMap.get(p.id);
 
-                // My JSX expects:
-                // product.cmv (as %) -> wait, product_costs_view usually has cmv as currency?
-                // Let's check calculation in original code:
-                // cmv comes from product_costs_view. Usually it is cost price.
-                // In my JSX I used `product.cmv > 40` implies percentage.
-                // But in logic: `p.cmv` is cost.
-                // I need to calculate `cmvPercent` for the product.
+                // Priority: 1. Detailed Sales Table (if used), 2. Direct Products Table (Import), 3. View Data
+                const actualQty = salesData.qty > 0 ? salesData.qty : (directSales?.last_sales_qty || p.last_sales_qty || 0);
+
+                // Use imported Average Price if available (User request: Qty * Avg Price)
+                const avgPrice = directSales?.average_sale_price || p.average_sale_price || p.sale_price || 0;
+
+                // Revenue = Qty * Avg Price (most accurate reflection of actual sales)
+                const revenue = actualQty * avgPrice;
+
+                const totalCmv = actualQty * (p.cmv || 0); // Total Cost of Goods Sold = Qty * Unit Cost
+                const grossProfit = revenue - totalCmv;
+                const margin = revenue > 0 ? grossProfit : 0;
+
                 const cmvPercent = revenue > 0 ? (totalCmv / revenue) * 100 : 0;
 
                 return {
                     ...p,
-                    last_sales_qty: salesData.qty,
-                    last_sales_total: salesData.total,
+                    last_sales_qty: actualQty,
+                    last_sales_total: revenue, // Override strictly with calculated revenue
+                    average_sale_price: avgPrice,
                     revenue,
                     cost: totalCmv,
                     grossProfit,
                     margin,
-                    cmv: cmvPercent, // Overwriting or adding new field for %? Be careful. Let's stick to what mapping expected.
-                    // The JSX uses `product.cmv` as percentage for conditional class? Yes: `product.cmv > 40`.
-                    // So I should map `cmv` to the percentage here for the UI object.
+                    cmv: cmvPercent,
                 };
             }).filter(p => p.last_sales_qty > 0)
                 .sort((a, b) => b.last_sales_qty - a.last_sales_qty);
 
             setProducts(productsWithMetrics as any);
-
-            // 5. Fetch Fixed Costs
-            const { data: costs } = await supabase.from('fixed_costs').select('monthly_value');
-            const totalFixed = (costs || []).reduce((acc, curr) => acc + Number(curr.monthly_value), 0);
-            setFixedCostsTotal(totalFixed);
 
             // 6. Fetch Variable Fees (Taxes)
             const { data: fees } = await supabase.from('fees').select('percentage');
@@ -125,7 +128,6 @@ export function CmvAnalysis() {
     const realTotalVariableCost = (realTotalRevenue * totalVariablePercent) / 100;
 
     const globalContributionMargin = realTotalRevenue - realTotalCmv - realTotalVariableCost;
-    const operationalResult = globalContributionMargin - fixedCostsTotal;
 
     const globalCmvPercent = realTotalRevenue > 0 ? (realTotalCmv / realTotalRevenue) * 100 : 0;
 
@@ -133,12 +135,7 @@ export function CmvAnalysis() {
     const metrics = {
         globalCmv: globalCmvPercent,
         cmvTrend: -2.5, // Dummy for now or calc comparison
-        grossProfit: globalContributionMargin, // Or just revenue - cmv? "Lucro Bruto" usually Rev - CMV. "Margem Contrib" includes var costs.
-        // My JSX says "Lucro Bruto... Faturamento - Custos Variáveis". That's actually Contrib Margin technically if CMV included?
-        // Let's stick to calculated values.
-        // JSX: "Lucro Bruto... Faturamento - Custos Variáveis" -> Wait, usually Gross Profit = Rev - COGS (CMV).
-        // Contrib Margin = Rev - Var Costs (CMV + Taxes).
-        // I'll map grossProfit to globalContributionMargin for now as that seems to be the intent of "profit after variable costs".
+        grossProfit: globalContributionMargin,
         topProduct: products[0]?.name,
         worstProduct: [...products].sort((a, b: any) => (b.cmv || 0) - (a.cmv || 0))[0]?.name, // Highest CMV % is worst?
         products: products
@@ -268,8 +265,10 @@ export function CmvAnalysis() {
                     <table className="data-table text-sm">
                         <thead>
                             <tr>
-                                <th className="pl-6">Produto</th>
-                                <th className="text-right">Preço Venda</th>
+                                <th className="pl-6 text-left">Produto</th>
+                                <th className="text-right">Qtd</th>
+                                <th className="text-right">Preço Médio</th>
+                                <th className="text-right">Faturamento</th>
                                 <th className="text-right">Custo Total</th>
                                 <th className="text-right">CMV %</th>
                                 <th className="text-right">Margem R$</th>
@@ -280,7 +279,9 @@ export function CmvAnalysis() {
                             {metrics.products.slice(0, 10).map((product: any) => (
                                 <tr key={product.id} className="hover:bg-slate-700/20 transition-colors">
                                     <td className="pl-6 font-medium text-slate-200">{product.name}</td>
-                                    <td className="text-right text-slate-300">R$ {product.price.toFixed(2)}</td>
+                                    <td className="text-right text-slate-300">{product.last_sales_qty}</td>
+                                    <td className="text-right text-slate-300">R$ {(product.average_sale_price || product.sale_price || 0).toFixed(2)}</td>
+                                    <td className="text-right text-slate-300">R$ {(product.revenue || 0).toFixed(2)}</td>
                                     <td className="text-right text-slate-300">R$ {product.cost.toFixed(2)}</td>
                                     <td className="text-right font-bold">
                                         <span className={product.cmv > 40 ? 'text-red-400' : product.cmv > 30 ? 'text-amber-400' : 'text-emerald-400'}>
@@ -290,8 +291,8 @@ export function CmvAnalysis() {
                                     <td className="text-right text-slate-300">R$ {product.margin.toFixed(2)}</td>
                                     <td className="text-right pr-6">
                                         <span className={`px-2 py-1 rounded text-xs font-medium ${product.cmv > 40 ? 'bg-red-500/10 text-red-400' :
-                                                product.cmv > 30 ? 'bg-amber-500/10 text-amber-400' :
-                                                    'bg-emerald-500/10 text-emerald-400'
+                                            product.cmv > 30 ? 'bg-amber-500/10 text-amber-400' :
+                                                'bg-emerald-500/10 text-emerald-400'
                                             }`}>
                                             {product.cmv > 40 ? 'Crítico' : product.cmv > 30 ? 'Atenção' : 'Ideal'}
                                         </span>
