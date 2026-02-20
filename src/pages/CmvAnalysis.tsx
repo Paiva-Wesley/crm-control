@@ -3,24 +3,11 @@ import {
     PieChart, TrendingUp, DollarSign, BarChart3, AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { ProductWithCost } from '../types';
+// ProductWithCost import removed
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { computeProductMetrics } from '../lib/pricing';
 
-interface ProductWithMetrics extends Omit<ProductWithCost, 'cmv'> {
-    last_sales_qty: number;
-    last_sales_total: number;
-    // Calculated fields
-    revenue?: number;
-    cost?: number; // total cmv cost
-    grossProfit?: number; // revenue - cost
-    estimatedProfit?: number; // New: Estimated Profit (Total)
-    estimatedMarginPercent?: number; // New: Estimated Margin % (Total)
-    margin?: number; // margin in R$
-    marginPercent?: number; // %
-    cmv: number; // % (Overwriting base cmv which is unit cost)
-    status?: string;
-}
+// ProductWithMetrics interface removed (unused)
 
 export function CmvAnalysis() {
     const [loading, setLoading] = useState(true);

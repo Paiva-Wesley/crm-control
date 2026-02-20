@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Plus, Search, Edit2, Trash2, Utensils, Calculator, Beaker, Box, Save, Layers, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Ingredient, IngredientComponent } from '../types';
+import type { Ingredient } from '../types';
 import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';

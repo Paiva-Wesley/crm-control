@@ -40,7 +40,7 @@ export function Plans() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                 {plans.map(plan => {
-                    const isCurrent = subscription?.plan_id === plan.id;
+                    const isCurrent = subscription?.plan_id === plan.id.toString();
                     let features: string[] = [];
                     try {
                         if (Array.isArray(plan.features)) {
