@@ -23,6 +23,7 @@ export interface Ingredient {
     created_at?: string;
     category?: 'Insumo' | 'Embalagem' | 'Acompanhamento';
     is_composite?: boolean;
+    yield_quantity?: number | null;
 }
 
 export interface IngredientComponent {

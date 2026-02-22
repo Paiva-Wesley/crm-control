@@ -40,12 +40,14 @@ export function Ingredients() {
         cost_per_unit: string;
         category: IngredientCategory;
         is_composite: boolean;
+        yield_quantity: string;
     }>({
         name: '',
         unit: 'kg',
         cost_per_unit: '',
         category: 'Insumo',
-        is_composite: false
+        is_composite: false,
+        yield_quantity: ''
     });
 
     // Composite sub-ingredients
@@ -98,12 +100,14 @@ export function Ingredients() {
         }, 0);
     }, [components, ingredients, formData.is_composite]);
 
-    // Sync composite cost to form
+    // Sync composite cost to form (divided by yield if set)
     useEffect(() => {
         if (formData.is_composite && compositeCost > 0) {
-            setFormData(prev => ({ ...prev, cost_per_unit: compositeCost.toFixed(4) }));
+            const yieldQty = parseFloat(formData.yield_quantity) || 0;
+            const finalCost = yieldQty > 0 ? compositeCost / yieldQty : compositeCost;
+            setFormData(prev => ({ ...prev, cost_per_unit: finalCost.toFixed(4) }));
         }
-    }, [compositeCost, formData.is_composite]);
+    }, [compositeCost, formData.is_composite, formData.yield_quantity]);
 
     async function fetchIngredients() {
         try {
@@ -172,7 +176,9 @@ export function Ingredients() {
                 cost_per_unit: costValue,
                 category: formData.category,
                 company_id: companyId,
-                is_composite: formData.is_composite
+                is_composite: formData.is_composite,
+                yield_quantity: formData.is_composite && formData.yield_quantity
+                    ? parseFloat(formData.yield_quantity) : null
             };
 
             let ingredientId = editingId;
@@ -271,7 +277,8 @@ export function Ingredients() {
             unit: ingredient.unit,
             cost_per_unit: ingredient.cost_per_unit.toString(),
             category: ingredient.category || 'Insumo',
-            is_composite: ingredient.is_composite || false
+            is_composite: ingredient.is_composite || false,
+            yield_quantity: ingredient.yield_quantity?.toString() || ''
         });
         setCalcValues({ packagePrice: '', packageAmount: '', unitMultiplier: '1' });
 
@@ -298,11 +305,20 @@ export function Ingredients() {
     }
 
     function resetForm() {
-        setFormData({ name: '', unit: 'kg', cost_per_unit: '', category: activeTab, is_composite: false });
+        const defaultUnit = activeTab === 'Embalagem' ? 'un' : activeTab === 'Acompanhamento' ? 'un' : 'kg';
+        setFormData({ name: '', unit: defaultUnit, cost_per_unit: '', category: activeTab, is_composite: false, yield_quantity: '' });
         setCalcValues({ packagePrice: '', packageAmount: '', unitMultiplier: '1' });
         setComponents([]);
         setEditingId(null);
     }
+
+    // Ensure unit is always valid for the current category
+    useEffect(() => {
+        const validUnits = getUnitOptions(formData.category);
+        if (!validUnits.includes(formData.unit)) {
+            setFormData(prev => ({ ...prev, unit: validUnits[0] }));
+        }
+    }, [formData.category, formData.unit]);
 
     function addComponent() {
         setComponents(prev => [...prev, { child_ingredient_id: 0, quantity: '' }]);
@@ -464,6 +480,11 @@ export function Ingredients() {
                                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400 border border-purple-500/20">
                                                                 <Layers size={12} />
                                                                 Composto
+                                                            </span>
+                                                        )}
+                                                        {ing.is_composite && ing.yield_quantity && ing.yield_quantity > 0 && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                                                Rende {ing.yield_quantity} {ing.unit}
                                                             </span>
                                                         )}
                                                     </div>
@@ -668,10 +689,55 @@ export function Ingredients() {
 
                             {/* Composite Cost Total */}
                             <div className="flex items-center justify-between pt-3 border-t border-purple-500/20">
-                                <span className="text-sm font-medium text-slate-400">Custo Total Calculado:</span>
+                                <span className="text-sm font-medium text-slate-400">Custo Total da Receita:</span>
                                 <span className="text-lg font-bold text-purple-400">
                                     R$ {compositeCost.toFixed(4)}
                                 </span>
+                            </div>
+
+                            {/* Yield / Rendimento */}
+                            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4 space-y-3 mt-3">
+                                <h4 className="text-sm font-semibold text-amber-400 flex items-center gap-2">
+                                    <Calculator size={16} />
+                                    Rendimento (opcional)
+                                </h4>
+                                <p className="text-xs text-slate-500">
+                                    Quantas porções/unidades essa receita rende? O custo por unidade será dividido pelo rendimento.
+                                </p>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Quantidade que rende</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            placeholder="Ex: 12"
+                                            value={formData.yield_quantity}
+                                            onChange={e => setFormData(prev => ({ ...prev, yield_quantity: e.target.value }))}
+                                            className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 text-sm placeholder-slate-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition duration-200"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Unidade</label>
+                                        <select
+                                            value={formData.unit}
+                                            onChange={e => setFormData(prev => ({ ...prev, unit: e.target.value }))}
+                                            className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-slate-100 text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition duration-200"
+                                        >
+                                            {getUnitOptions(formData.category).map(unit => (
+                                                <option key={unit} value={unit}>{unit}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                {parseFloat(formData.yield_quantity) > 0 && compositeCost > 0 && (
+                                    <div className="flex items-center justify-between pt-2 border-t border-amber-500/20">
+                                        <span className="text-sm text-slate-400">Custo por {formData.unit}:</span>
+                                        <span className="text-lg font-bold text-amber-400">
+                                            R$ {(compositeCost / parseFloat(formData.yield_quantity)).toFixed(4)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
