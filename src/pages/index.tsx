@@ -10,3 +10,4 @@ export { Channels } from './Channels';
 export { Dashboard } from './Dashboard';
 export { Plans } from './Plans';
 export { Performance } from './Performance';
+export * from './Reports';

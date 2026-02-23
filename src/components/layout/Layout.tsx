@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star, User, Lock, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star, User, Lock, TrendingUp, LineChart } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSubscription } from '../../hooks/useSubscription';
 
@@ -191,6 +191,15 @@ export function Layout() {
                         to="/performance"
                         icon={TrendingUp}
                         label="Desempenho"
+                        sidebarOpen={sidebarOpen}
+                        locked={!hasInsights}
+                        badgeLabel="Pro"
+                    />
+
+                    <GatedNavLink
+                        to="/reports"
+                        icon={LineChart}
+                        label="Relatórios"
                         sidebarOpen={sidebarOpen}
                         locked={!hasInsights}
                         badgeLabel="Pro"

@@ -7,6 +7,7 @@ import { Plans } from './pages/Plans';
 import { CmvAnalysis } from './pages/CmvAnalysis';
 import { VariableCosts } from './pages/VariableCosts';
 import { Performance } from './pages/Performance';
+import { Reports } from './pages/Reports';
 import { Login } from './pages/auth/Login';
 import { Signup } from './pages/auth/Signup';
 import { Onboarding } from './pages/auth/Onboarding';
@@ -87,6 +88,7 @@ function App() {
                 <Route path="drinks" element={<ResaleProducts />} />
                 <Route path="combos" element={<FeatureRoute flag="combos" element={<Combos />} />} />
                 <Route path="performance" element={<FeatureRoute flag="insights" element={<Performance />} />} />
+                <Route path="reports" element={<FeatureRoute flag="insights" element={<Reports />} />} />
                 <Route path="plans" element={<Plans />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
