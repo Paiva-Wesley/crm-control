@@ -127,7 +127,7 @@ export function BusinessData() {
                     target_cmv_percent: settings.target_cmv_percent ?? 35,
                     revenue_input_mode: settings.revenue_input_mode ?? 'single',
                     average_monthly_revenue_input: settings.average_monthly_revenue_input ?? 0,
-                }).eq('id', data.id);
+                }).eq('id', data.id).eq('company_id', companyId);
             } else {
                 await supabase.from('business_settings').insert({
                     desired_profit_percent: settings.desired_profit_percent,

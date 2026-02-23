@@ -79,7 +79,7 @@ export function Plans() {
                     status: 'active',
                     current_period_start: new Date().toISOString(),
                     current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                }).eq('id', existing.id);
+                }).eq('id', existing.id).eq('company_id', companyId);
             } else {
                 // Insert new
                 await supabase.from('subscriptions').insert({

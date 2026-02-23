@@ -207,7 +207,8 @@ export function Ingredients() {
                 await supabase
                     .from('ingredient_components')
                     .delete()
-                    .eq('parent_ingredient_id', ingredientId);
+                    .eq('parent_ingredient_id', ingredientId)
+                    .eq('company_id', companyId);
 
                 // Insert new components
                 const componentPayloads = components
@@ -230,7 +231,8 @@ export function Ingredients() {
                 await supabase
                     .from('ingredient_components')
                     .delete()
-                    .eq('parent_ingredient_id', editingId);
+                    .eq('parent_ingredient_id', editingId)
+                    .eq('company_id', companyId);
             }
 
             setIsModalOpen(false);
@@ -291,7 +293,8 @@ export function Ingredients() {
             const { data } = await supabase
                 .from('ingredient_components')
                 .select('child_ingredient_id, quantity')
-                .eq('parent_ingredient_id', ingredient.id);
+                .eq('parent_ingredient_id', ingredient.id)
+                .eq('company_id', companyId);
 
             if (data && data.length > 0) {
                 setComponents(data.map(c => ({
