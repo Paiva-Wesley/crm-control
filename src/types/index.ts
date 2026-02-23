@@ -131,23 +131,49 @@ export interface Sale {
     sold_at: string;
 }
 
+export interface PlanLimits {
+    products: number;
+    ingredients: number;
+    combos: number;
+    channels: number;
+    history_days: number;
+    users: number;
+    [key: string]: number;
+}
+
+export interface PlanFlags {
+    import_sales: boolean;
+    channels: boolean;
+    fees: boolean;
+    fixed_costs: boolean;
+    variable_costs: boolean;
+    combos: boolean;
+    cmv_analysis: boolean;
+    exports: boolean;
+    insights: boolean;
+    cost_simulation: boolean;
+    [key: string]: boolean;
+}
+
+export interface PlanFeaturesV2 {
+    limits: PlanLimits;
+    flags: PlanFlags;
+    marketing?: string[];
+}
+
 export interface Plan {
-    id: number;
+    id: string;
     name: string;
     price: number;
-    features: string[];
-    limits: {
-        products: number;
-        ingredients: number;
-        users: number;
-    };
+    description?: string;
+    features: PlanFeaturesV2 | null;
     created_at?: string;
 }
 
 export interface Subscription {
     id: number;
     company_id: string;
-    plan_id: number;
+    plan_id: string;
     status: 'active' | 'past_due' | 'canceled' | 'trialing';
     current_period_start: string;
     current_period_end: string;

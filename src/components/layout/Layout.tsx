@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { NavLink, Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star, User } from 'lucide-react';
+import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star, User, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscription } from '../../hooks/useSubscription';
 
 interface NavGroupProps {
     id: string;
@@ -12,25 +13,85 @@ interface NavGroupProps {
     isOpen: boolean;
     onToggle: (id: string) => void;
     isActive?: boolean;
+    locked?: boolean;
+    badgeLabel?: string;
 }
 
-function NavGroup({ id, label, icon: Icon, children, sidebarOpen, isOpen, onToggle, isActive }: NavGroupProps) {
+function NavGroup({ id, label, icon: Icon, children, sidebarOpen, isOpen, onToggle, isActive, locked, badgeLabel }: NavGroupProps) {
     if (!sidebarOpen) return <div className="flex flex-col gap-1">{children}</div>;
 
     return (
         <div className="flex flex-col gap-1">
             <button
-                className={`flex items-center justify-between px-4 py-3 rounded-lg text-slate-400 hover:bg-dark-700 hover:text-white transition-colors duration-200 ${isActive ? 'text-white' : ''}`}
-                onClick={() => onToggle(id)}
+                className={`flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${locked
+                    ? 'text-slate-600 cursor-not-allowed'
+                    : isActive
+                        ? 'text-white hover:bg-dark-700'
+                        : 'text-slate-400 hover:bg-dark-700 hover:text-white'
+                    }`}
+                onClick={() => !locked && onToggle(id)}
             >
                 <div className="flex items-center gap-2">
                     <Icon size={20} />
                     <span>{label}</span>
+                    {locked && badgeLabel && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 uppercase tracking-wider leading-none">
+                            {badgeLabel}
+                        </span>
+                    )}
                 </div>
-                {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                {!locked && (isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />)}
+                {locked && <Lock size={14} className="text-slate-600" />}
             </button>
-            {isOpen && <div className="flex flex-col gap-1">{children}</div>}
+            {!locked && isOpen && <div className="flex flex-col gap-1">{children}</div>}
         </div>
+    );
+}
+
+interface GatedNavLinkProps {
+    to: string;
+    icon: any;
+    label: string;
+    sidebarOpen: boolean;
+    locked?: boolean;
+    badgeLabel?: string;
+}
+
+function GatedNavLink({ to, icon: Icon, label, sidebarOpen, locked, badgeLabel }: GatedNavLinkProps) {
+    const navigate = useNavigate();
+
+    if (locked) {
+        return (
+            <button
+                onClick={() => navigate('/plans')}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 cursor-not-allowed transition-colors duration-200 w-full text-left hover:bg-dark-700/50"
+            >
+                <Icon size={20} />
+                {sidebarOpen && (
+                    <span className="flex items-center gap-2">
+                        {label}
+                        {badgeLabel && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 uppercase tracking-wider leading-none">
+                                {badgeLabel}
+                            </span>
+                        )}
+                    </span>
+                )}
+            </button>
+        );
+    }
+
+    return (
+        <NavLink
+            to={to}
+            className={({ isActive }) => `
+                flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
+                ${isActive ? 'bg-primary text-white' : 'text-slate-400 hover:bg-dark-700 hover:text-white'}
+            `}
+        >
+            <Icon size={20} />
+            {sidebarOpen && <span>{label}</span>}
+        </NavLink>
     );
 }
 
@@ -39,6 +100,7 @@ export function Layout() {
     const location = useLocation();
     const [openGroup, setOpenGroup] = useState<string | null>(null);
     const { signOut, user, companyName } = useAuth();
+    const { canAccess } = useSubscription();
 
     React.useEffect(() => {
         const path = location.pathname;
@@ -54,6 +116,16 @@ export function Layout() {
     const handleToggle = (id: string) => {
         setOpenGroup(prev => prev === id ? null : id);
     };
+
+    // Feature access checks (safe during loading — returns true)
+    const hasFixedCosts = canAccess('fixed_costs');
+    const hasVariableCosts = canAccess('variable_costs');
+    const hasFees = canAccess('fees');
+    const hasChannels = canAccess('channels');
+    const hasCombos = canAccess('combos');
+
+    // Custos group is locked if both fixed and variable costs are locked
+    const costGroupLocked = !hasFixedCosts && !hasVariableCosts;
 
     return (
         <div className="flex h-screen bg-dark-900 overflow-hidden">
@@ -104,7 +176,7 @@ export function Layout() {
                     </NavLink>
 
                     <NavLink
-                        to="/cmv-analysis" // Matched route from App.tsx
+                        to="/cmv-analysis"
                         className={({ isActive }) => `
                             flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
                             ${isActive ? 'bg-primary text-white' : 'text-slate-400 hover:bg-dark-700 hover:text-white'}
@@ -136,16 +208,15 @@ export function Layout() {
                         {sidebarOpen && <span>Bebidas</span>}
                     </NavLink>
 
-                    <NavLink
+                    {/* Combos - Gated */}
+                    <GatedNavLink
                         to="/combos"
-                        className={({ isActive }) => `
-                            flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
-                            ${isActive ? 'bg-primary text-white' : 'text-slate-400 hover:bg-dark-700 hover:text-white'}
-                        `}
-                    >
-                        <ShoppingBag size={20} />
-                        {sidebarOpen && <span>Fichas de Combos</span>}
-                    </NavLink>
+                        icon={ShoppingBag}
+                        label="Fichas de Combos"
+                        sidebarOpen={sidebarOpen}
+                        locked={!hasCombos}
+                        badgeLabel="Pro"
+                    />
 
                     {/* Group: Itens */}
                     <NavGroup
@@ -201,7 +272,7 @@ export function Layout() {
                         </Link>
                     </NavGroup>
 
-                    {/* Group: Custos */}
+                    {/* Group: Custos - Gated */}
                     <NavGroup
                         id="custos"
                         label="Custos"
@@ -210,6 +281,8 @@ export function Layout() {
                         isOpen={openGroup === 'custos'}
                         onToggle={handleToggle}
                         isActive={location.pathname.includes('/fixed-costs') || location.pathname.includes('/variable-costs')}
+                        locked={costGroupLocked}
+                        badgeLabel="Pro"
                     >
                         <Link
                             to="/fixed-costs?tab=Equipe"
@@ -255,27 +328,26 @@ export function Layout() {
                         </Link>
                     </NavGroup>
 
-                    <NavLink
+                    {/* Taxas - Gated */}
+                    <GatedNavLink
                         to="/fees"
-                        className={({ isActive }) => `
-                            flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
-                            ${isActive ? 'bg-primary text-white' : 'text-slate-400 hover:bg-dark-700 hover:text-white'}
-                        `}
-                    >
-                        <Calculator size={20} />
-                        {sidebarOpen && <span>Taxas</span>}
-                    </NavLink>
+                        icon={Calculator}
+                        label="Taxas"
+                        sidebarOpen={sidebarOpen}
+                        locked={!hasFees}
+                        badgeLabel="Pro"
+                    />
 
-                    <NavLink
+                    {/* Canais - Gated */}
+                    <GatedNavLink
                         to="/channels"
-                        className={({ isActive }) => `
-                            flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
-                            ${isActive ? 'bg-primary text-white' : 'text-slate-400 hover:bg-dark-700 hover:text-white'}
-                        `}
-                    >
-                        <Store size={20} />
-                        {sidebarOpen && <span>Canais de Venda</span>}
-                    </NavLink>
+                        icon={Store}
+                        label="Canais de Venda"
+                        sidebarOpen={sidebarOpen}
+                        locked={!hasChannels}
+                        badgeLabel="Pro"
+                    />
+
                     <NavLink
                         to="/plans"
                         className={({ isActive }) => `

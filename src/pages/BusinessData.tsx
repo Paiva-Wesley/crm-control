@@ -1,11 +1,13 @@
 
 import { useEffect, useState } from 'react';
-import { Save, Upload } from 'lucide-react';
+import { Save, Upload, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { BusinessSettings } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
+import { useSubscription } from '../hooks/useSubscription';
 import { ImportSalesModal } from '../components/business/ImportSalesModal';
+import { useNavigate } from 'react-router-dom';
 
 interface BusinessSettingsExtended extends BusinessSettings {
     monthly_revenue: Record<string, number>;
@@ -14,6 +16,8 @@ interface BusinessSettingsExtended extends BusinessSettings {
 export function BusinessData() {
     const { companyId } = useAuth();
     const biz = useBusinessSettings();
+    const { canAccess } = useSubscription();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<BusinessSettingsExtended | null>(null);
     const [fixedCostsTotal, setFixedCostsTotal] = useState(0);
@@ -255,10 +259,23 @@ export function BusinessData() {
                 </div>
                 <div className="flex gap-3">
                     <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-all border border-slate-700"
+                        onClick={() => {
+                            if (!canAccess('import_sales')) {
+                                navigate('/plans');
+                                return;
+                            }
+                            setIsImportModalOpen(true);
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all border ${canAccess('import_sales')
+                                ? 'text-slate-300 bg-slate-800 hover:bg-slate-700 border-slate-700'
+                                : 'text-slate-500 bg-slate-800/50 border-slate-700/50 cursor-not-allowed'
+                            }`}
                     >
-                        <Upload size={16} /> Importar
+                        {canAccess('import_sales') ? <Upload size={16} /> : <Lock size={16} />}
+                        Importar
+                        {!canAccess('import_sales') && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 uppercase tracking-wider leading-none">Pro</span>
+                        )}
                     </button>
                     <button
                         onClick={handleSaveSettings}
