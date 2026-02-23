@@ -9,8 +9,11 @@ export interface Product {
     category?: string;
     is_combo?: boolean;
     company_id?: number;
+    /** @deprecated Use sales table. Will be removed in Phase 2. */
     last_sales_qty?: number;
+    /** @deprecated Use sales table. Will be removed in Phase 2. */
     last_sales_total?: number;
+    /** @deprecated Use sales table. Will be removed in Phase 2. */
     average_sale_price?: number;
 }
 

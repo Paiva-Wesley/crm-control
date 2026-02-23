@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { AlertCircle, Check } from 'lucide-react';
+import { AlertCircle, Check, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Modal } from '../ui/Modal';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ImportSalesModalProps {
     isOpen: boolean;
@@ -15,22 +16,21 @@ interface ParsedItem {
     qty: number;
     total: number;
     avgPrice: number;
-    status: 'new' | 'update' | 'error';
+    status: 'matched' | 'not_found';
     existingId?: number;
-    isCombo?: boolean;
-    comboItems?: { childId: number; qty: number; name?: string }[];
 }
 
 export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModalProps) {
+    const { companyId } = useAuth();
     const [rawText, setRawText] = useState('');
     const [previewData, setPreviewData] = useState<ParsedItem[]>([]);
     const [step, setStep] = useState<'input' | 'preview'>('input');
     const [loading, setLoading] = useState(false);
+    const [importErrors, setImportErrors] = useState<string[]>([]);
 
     // Helpers to parse Brazilian currency/numbers (Robust)
     function parseBRL(value: string): number {
         if (!value) return 0;
-        // Remove currency symbol, spaces, remove dots (thousands), replace comma with dot
         const clean = value.replace('R$', '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.').trim();
         return parseFloat(clean) || 0;
     }
@@ -44,9 +44,12 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
         if (!rawText.trim()) return;
 
         setLoading(true);
+        setImportErrors([]);
         try {
-            // Fetch existing products
-            const { data: existingProducts } = await supabase.from('products').select('id, name');
+            // Fetch existing products (filtered by company)
+            const query = supabase.from('products').select('id, name');
+            if (companyId) query.eq('company_id', companyId);
+            const { data: existingProducts } = await query;
             const products = existingProducts || [];
 
             // Helper for normalization
@@ -57,7 +60,6 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
             const parsed: ParsedItem[] = [];
 
             // --- Header Detection & Dynamic Mapping ---
-            // Default indices (Standard: Product | Category | Qty | Total | Avg)
             let idxProduct = 0;
             let idxCategory = 1;
             let idxQty = 2;
@@ -66,12 +68,10 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
 
             let dataStartIndex = 0;
 
-            // Normalize helper for headers
             const normHeader = (h: string) => h.toLowerCase().trim()
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
-                .replace(/[^a-z0-9]/g, ""); // remove special chars
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]/g, "");
 
-            // Try to find header line
             const headerLineIndex = lines.findIndex(line => {
                 const lower = normHeader(line);
                 return lower.includes('produto') && (lower.includes('qtd') || lower.includes('quantidade'));
@@ -80,7 +80,6 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
             if (headerLineIndex !== -1) {
                 const headers = lines[headerLineIndex].split('\t').map(normHeader);
 
-                // Reset indices to -1 to ensure we only use found ones
                 idxProduct = -1; idxTotal = -1; idxAvg = -1; idxQty = -1; idxCategory = -1;
 
                 headers.forEach((h, i) => {
@@ -91,8 +90,6 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                     else if (h.includes('qtd') || h.includes('quant')) idxQty = i;
                 });
 
-                // If critical columns not found, revert to defaults or warn? 
-                // Let's fallback to standard if we can't find Product/Qty (revert to default)
                 if (idxProduct === -1 || idxQty === -1) {
                     console.warn('Could not identify columns by name, using default positions.');
                     idxProduct = 0; idxCategory = 1; idxQty = 2; idxTotal = 3; idxAvg = 4;
@@ -106,13 +103,8 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                 if (!line) continue;
 
                 const cols = line.split('\t');
-                const maxIdx = Math.max(idxProduct, idxCategory, idxQty, idxTotal, idxAvg);
-                if (cols.length <= maxIdx && maxIdx < 5) {
-                    // if line is too short but we are using default logic, skip
-                }
 
                 const name = cols[idxProduct]?.trim();
-                // Filter out header row if logic failed to skip it, or 'Total' row
                 if (!name || name === 'Total' || normHeader(name) === 'produto') continue;
 
                 const category = idxCategory !== -1 ? cols[idxCategory]?.trim() : '';
@@ -136,41 +128,10 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                     if (normName.endsWith('s')) existingId = productMap.get(normName.slice(0, -1));
                 }
 
-                let isCombo = false;
-                let comboItems: { childId: number; qty: number; name: string }[] = [];
-
-                if (category && category.toLowerCase().includes('combo') && !existingId) {
-                    isCombo = true;
-                    // Regex split by comma or " e " (case insensitive)
-                    const parts = name.split(/,| e /i);
-
-                    for (const part of parts) {
-                        const match = part.trim().match(/^(\d+)\s+(.+)$/);
-                        if (match) {
-                            const q = parseInt(match[1]);
-                            const childNameRaw = match[2].trim();
-                            const childNameNorm = normalize(childNameRaw);
-
-                            let childId = productMap.get(childNameNorm);
-
-                            // Try plural handling
-                            if (!childId && childNameNorm.endsWith('s')) {
-                                childId = productMap.get(childNameNorm.slice(0, -1));
-                            }
-                            // Fuzzy/Substring fallback
-                            if (!childId) {
-                                const bestMatch = products.find(p => {
-                                    const pNorm = normalize(p.name);
-                                    return pNorm === childNameNorm || pNorm === childNameNorm.slice(0, -1) || childNameNorm === pNorm.slice(0, -1);
-                                });
-                                if (bestMatch) childId = bestMatch.id;
-                            }
-
-                            if (childId) {
-                                comboItems.push({ childId, qty: q, name: childNameRaw });
-                            }
-                        }
-                    }
+                // Skip qty 0 or invalid
+                if (qty <= 0) {
+                    console.warn(`Importação: qty inválida para "${name}" (${qty}), ignorado.`);
+                    continue;
                 }
 
                 parsed.push({
@@ -179,10 +140,8 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                     qty,
                     total,
                     avgPrice,
-                    status: existingId ? 'update' : 'new',
-                    existingId,
-                    isCombo,
-                    comboItems
+                    status: existingId ? 'matched' : 'not_found',
+                    existingId
                 });
             }
 
@@ -198,51 +157,47 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
 
     async function handleConfirmImport() {
         setLoading(true);
+        setImportErrors([]);
         try {
-            const updates = [];
+            const errors: string[] = [];
+            const matchedItems = previewData.filter(item => item.status === 'matched' && item.existingId);
 
-            for (const item of previewData) {
-                if (item.status === 'update' && item.existingId) {
-                    updates.push(
-                        supabase.from('products').update({
-                            last_sales_qty: item.qty,
-                            last_sales_total: item.total,
-                            average_sale_price: item.avgPrice
-                        }).eq('id', item.existingId)
-                    );
-                } else {
-                    const { data: newProduct, error } = await supabase.from('products').insert({
-                        name: item.name,
-                        category: item.category,
-                        sale_price: item.avgPrice,
-                        last_sales_qty: item.qty,
-                        last_sales_total: item.total,
-                        average_sale_price: item.avgPrice,
-                        active: true,
-                        is_combo: item.isCombo || false
-                    }).select().single();
-
-                    if (error) {
-                        console.error("Error inserting product", item.name, error);
-                        continue;
-                    }
-
-                    if (item.isCombo && item.comboItems && item.comboItems.length > 0) {
-                        const comboInserts = item.comboItems.map(c => ({
-                            parent_product_id: newProduct.id,
-                            child_product_id: c.childId,
-                            quantity: c.qty
-                        }));
-                        await supabase.from('product_combos').insert(comboInserts);
-                    }
-                }
+            if (matchedItems.length === 0) {
+                alert('Nenhum produto reconhecido para importar.');
+                setLoading(false);
+                return;
             }
 
-            if (updates.length > 0) await Promise.all(updates);
+            // Build sales records
+            const salesRecords = matchedItems.map(item => ({
+                product_id: item.existingId!,
+                quantity: item.qty,
+                sale_price: item.avgPrice, // weighted avg unit price
+                company_id: companyId,
+                sold_at: new Date()
+            }));
 
-            alert('Importação concluída com sucesso!');
-            onSuccess();
-            onClose();
+            // Insert into sales table
+            const { error } = await supabase.from('sales').insert(salesRecords);
+
+            if (error) {
+                console.error('Error inserting sales:', error);
+                errors.push(`Erro ao gravar vendas: ${error.message}`);
+            }
+
+            if (errors.length > 0) {
+                setImportErrors(errors);
+                alert(`Importação com erros: ${errors.join(', ')}`);
+            } else {
+                const notFound = previewData.filter(item => item.status === 'not_found');
+                if (notFound.length > 0) {
+                    alert(`Importação concluída! ${matchedItems.length} vendas registradas.\n\n${notFound.length} produto(s) não encontrado(s) foram ignorados.`);
+                } else {
+                    alert(`Importação concluída! ${matchedItems.length} vendas registradas.`);
+                }
+                onSuccess();
+                onClose();
+            }
         } catch (error) {
             console.error('Error saving data:', error);
             alert('Erro ao salvar no banco de dados.');
@@ -250,6 +205,10 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
             setLoading(false);
         }
     }
+
+    const matchedCount = previewData.filter(i => i.status === 'matched').length;
+    const notFoundCount = previewData.filter(i => i.status === 'not_found').length;
+    const notFoundItems = previewData.filter(i => i.status === 'not_found');
 
     return (
         <Modal
@@ -268,6 +227,7 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                                 <p>1. No seu sistema de vendas, gere o relatório de produtos vendidos.</p>
                                 <p>2. Copie as colunas (Ctrl+C) na ordem: <strong>Produto | Categoria | Qtd Vendida | Faturamento | Preço Médio (Opcional)</strong></p>
                                 <p>3. Cole (Ctrl+V) no campo abaixo.</p>
+                                <p className="mt-2 text-amber-400">⚠️ Apenas produtos já cadastrados serão importados. Produtos não reconhecidos serão ignorados.</p>
                             </div>
                         </div>
 
@@ -294,12 +254,14 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                         <div className="flex gap-4 text-sm mb-4">
                             <div className="flex items-center gap-2 text-emerald-400">
                                 <Check size={16} />
-                                <span>{previewData.filter(i => i.status === 'update').length} Atualizações</span>
+                                <span>{matchedCount} Reconhecidos</span>
                             </div>
-                            <div className="flex items-center gap-2 text-blue-400">
-                                <PlusIcon size={16} />
-                                <span>{previewData.filter(i => i.status === 'new').length} Novos Cadastros</span>
-                            </div>
+                            {notFoundCount > 0 && (
+                                <div className="flex items-center gap-2 text-amber-400">
+                                    <AlertTriangle size={16} />
+                                    <span>{notFoundCount} Não Encontrados</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="max-h-96 overflow-y-auto border border-dark-700 rounded-lg">
@@ -316,30 +278,15 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                                 </thead>
                                 <tbody className="divide-y divide-dark-700">
                                     {previewData.map((item, idx) => (
-                                        <tr key={idx} className="hover:bg-dark-700/50">
+                                        <tr key={idx} className={`hover:bg-dark-700/50 ${item.status === 'not_found' ? 'opacity-50' : ''}`}>
                                             <td className="px-4 py-2">
-                                                {item.status === 'new' ? (
-                                                    <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-1 rounded">Novo</span>
+                                                {item.status === 'matched' ? (
+                                                    <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded">✓ Encontrado</span>
                                                 ) : (
-                                                    <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded">Update</span>
-                                                )}
-                                                {item.isCombo && (
-                                                    <span className="ml-1 text-xs bg-purple-500/10 text-purple-400 px-2 py-1 rounded">Combo Auto</span>
+                                                    <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-1 rounded">⚠ Ignorado</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-2">
-                                                <div>{item.name}</div>
-                                                {item.isCombo && item.comboItems && item.comboItems.length > 0 && (
-                                                    <div className="text-xs text-slate-500 mt-1">
-                                                        Itens: {item.comboItems.map(c => `${c.qty}x ${c.name || 'Produto'}`).join(', ')}
-                                                    </div>
-                                                )}
-                                                {item.isCombo && (!item.comboItems || item.comboItems.length === 0) && (
-                                                    <div className="text-xs text-red-500 mt-1">
-                                                        Nenhum item identificado
-                                                    </div>
-                                                )}
-                                            </td>
+                                            <td className="px-4 py-2">{item.name}</td>
                                             <td className="px-4 py-2 text-slate-400">{item.category}</td>
                                             <td className="px-4 py-2 text-right">{item.qty}</td>
                                             <td className="px-4 py-2 text-right">R$ {item.total.toFixed(2)}</td>
@@ -349,6 +296,30 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Not found items summary */}
+                        {notFoundItems.length > 0 && (
+                            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4">
+                                <p className="text-sm text-amber-400 font-medium mb-2">
+                                    Produtos não encontrados ({notFoundItems.length}):
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                    {notFoundItems.map(i => i.name).join(', ')}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Cadastre esses produtos primeiro na aba Produtos, depois importe novamente.
+                                </p>
+                            </div>
+                        )}
+
+                        {importErrors.length > 0 && (
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                                <p className="text-sm text-red-400 font-medium">Erros:</p>
+                                {importErrors.map((err, i) => (
+                                    <p key={i} className="text-xs text-red-300">{err}</p>
+                                ))}
+                            </div>
+                        )}
 
                         <div className="flex justify-between items-center pt-4">
                             <button
@@ -362,9 +333,9 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                                 <button
                                     onClick={handleConfirmImport}
                                     className="btn btn-primary"
-                                    disabled={loading}
+                                    disabled={loading || matchedCount === 0}
                                 >
-                                    {loading ? 'Salvando...' : 'Confirmar Importação'}
+                                    {loading ? 'Salvando...' : `Confirmar (${matchedCount} vendas)`}
                                 </button>
                             </div>
                         </div>
@@ -372,12 +343,5 @@ export function ImportSalesModal({ isOpen, onClose, onSuccess }: ImportSalesModa
                 )}
             </div>
         </Modal>
-    );
-}
-
-// Icon helper
-function PlusIcon({ size }: { size: number }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
     );
 }
