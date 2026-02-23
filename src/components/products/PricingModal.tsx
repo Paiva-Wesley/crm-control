@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { computeProductMetrics, type ProductMetrics } from '../../lib/pricing';
+import { useSubscription } from '../../hooks/useSubscription';
+import { CostSimulatorModal } from './CostSimulatorModal';
+import { TrendingUp } from 'lucide-react';
 
 interface PricingModalProps {
     isOpen: boolean;
@@ -10,6 +13,7 @@ interface PricingModalProps {
     cmv: number;
     currentSalePrice: number;
     productSalesQty?: number;
+    productId?: number;
 }
 
 const cmvIcon = (status: string) =>
@@ -17,9 +21,11 @@ const cmvIcon = (status: string) =>
 const marginIcon = (status: string) =>
     status === 'healthy' ? '🟢' : status === 'warning' ? '🟡' : '🔴';
 
-export function PricingModal({ isOpen, onClose, productName, cmv, currentSalePrice }: PricingModalProps) {
+export function PricingModal({ isOpen, onClose, productName, cmv, currentSalePrice, productId }: PricingModalProps) {
     const biz = useBusinessSettings();
+    const { canAccess } = useSubscription();
     const [salePrice, setSalePrice] = useState(currentSalePrice);
+    const [showSimulator, setShowSimulator] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -211,9 +217,28 @@ export function PricingModal({ isOpen, onClose, productName, cmv, currentSalePri
                     * Custos e markup calculados automaticamente com base nos Dados do Negócio.
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex justify-between items-center">
+                    {canAccess('cost_simulation') ? (
+                        <button
+                            onClick={() => setShowSimulator(true)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-all"
+                        >
+                            <TrendingUp size={16} />
+                            Simular aumento de custo
+                        </button>
+                    ) : <div />}
                     <button className="btn btn-primary" onClick={onClose}>Fechar</button>
                 </div>
+
+                {/* Cost Simulator Modal */}
+                <CostSimulatorModal
+                    isOpen={showSimulator}
+                    onClose={() => setShowSimulator(false)}
+                    productName={productName}
+                    currentCmv={cmv}
+                    currentSalePrice={currentSalePrice}
+                    productId={productId}
+                />
             </div>
         </Modal>
     );

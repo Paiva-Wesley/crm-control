@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Plus, Search, Trash2, Package } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { ProductWithCost } from '../types';
@@ -6,12 +6,13 @@ import { ProductModal } from '../components/products/ProductModal';
 import { useSubscription } from '../hooks/useSubscription';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { computeProductMetrics } from '../lib/pricing';
+import { buildInsights, getWorstInsightLevel } from '../lib/insights/buildInsights';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../contexts/ToastContext';
 
 export function Products() {
-    const { checkLimit, loading: subLoading } = useSubscription();
+    const { checkLimit, canAccess, loading: subLoading } = useSubscription();
     const [products, setProducts] = useState<ProductWithCost[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -19,6 +20,8 @@ export function Products() {
     const [editingProduct, setEditingProduct] = useState<ProductWithCost | null>(null);
     const { toast } = useToast();
     const biz = useBusinessSettings();
+
+    const showInsights = canAccess('insights');
 
     useEffect(() => {
         fetchProducts();
@@ -47,6 +50,44 @@ export function Products() {
             (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase()))
         );
 
+    // Pre-compute metrics + worst badge per product (memoized)
+    const productBadges = useMemo(() => {
+        if (!showInsights || biz.loading || !filteredProducts.length) return new Map<number, string | null>();
+
+        const map = new Map<number, string | null>();
+        for (const prod of filteredProducts) {
+            const price = Number(prod.sale_price) || 0;
+            const cmv = Number(prod.cmv) || 0;
+            if (price <= 0) {
+                map.set(prod.id, null);
+                continue;
+            }
+
+            const m = computeProductMetrics({
+                cmv,
+                salePrice: price,
+                fixedCostPercent: biz.fixedCostPercent,
+                variableCostPercent: biz.variableCostPercent,
+                desiredProfitPercent: biz.desiredProfitPercent,
+                totalFixedCosts: biz.totalFixedCosts,
+                estimatedMonthlySales: biz.estimatedMonthlySales,
+                averageMonthlyRevenue: biz.averageMonthlyRevenue,
+                channels: biz.channels,
+                fixedCostAllocationMode: biz.fixedCostAllocationMode,
+                targetCmvPercent: biz.targetCmvPercent,
+            });
+
+            const insights = buildInsights(
+                { name: prod.name, sale_price: price },
+                m,
+                { targetCmvPercent: biz.targetCmvPercent ?? 35, desiredProfitPercent: biz.desiredProfitPercent ?? 15 }
+            );
+
+            map.set(prod.id, getWorstInsightLevel(insights));
+        }
+        return map;
+    }, [showInsights, filteredProducts, biz]);
+
     function handleEdit(product: ProductWithCost) {
         setEditingProduct(product);
         setIsModalOpen(true);
@@ -71,6 +112,12 @@ export function Products() {
             toast.error('Erro ao excluir produto. Verifique dependências.');
         }
     }
+
+    const badgeEmoji = (level: string | null) => {
+        if (level === 'danger') return '🔴';
+        if (level === 'warning') return '🟠';
+        return null; // Don't show badge for info / null
+    };
 
     return (
         <div className="space-y-6">
@@ -154,7 +201,19 @@ export function Products() {
                                             style={{ opacity: prod.active ? 1 : 0.5 }}
                                             onClick={() => handleEdit(prod)}
                                         >
-                                            <td className="font-semibold text-slate-100">{prod.name}</td>
+                                            <td className="font-semibold text-slate-100">
+                                                <span className="flex items-center gap-2">
+                                                    {showInsights && badgeEmoji(productBadges.get(prod.id) ?? null) && (
+                                                        <span className="text-sm" title={
+                                                            productBadges.get(prod.id) === 'danger' ? 'Prejuízo' :
+                                                                productBadges.get(prod.id) === 'warning' ? 'Atenção' : ''
+                                                        }>
+                                                            {badgeEmoji(productBadges.get(prod.id) ?? null)}
+                                                        </span>
+                                                    )}
+                                                    {prod.name}
+                                                </span>
+                                            </td>
                                             <td>{prod.category || '-'}</td>
                                             <td>R$ {Number(prod.sale_price).toFixed(2)}</td>
                                             <td className="text-slate-400">R$ {Number(prod.cmv).toFixed(2)}</td>

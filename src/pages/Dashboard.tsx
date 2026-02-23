@@ -1,15 +1,26 @@
-import { useEffect, useState } from 'react';
-import { TrendingUp, DollarSign, Package, ShoppingCart } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { TrendingUp, DollarSign, Package, ShoppingCart, AlertTriangle, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { OnboardingChecklist } from '../components/dashboard/OnboardingChecklist';
+import { useSubscription } from '../hooks/useSubscription';
+import { useBusinessSettings } from '../hooks/useBusinessSettings';
+import { computeProductMetrics } from '../lib/pricing';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Dashboard() {
+    const navigate = useNavigate();
+    const { canAccess } = useSubscription();
+    const biz = useBusinessSettings();
+    const { companyId } = useAuth();
+
     const [stats, setStats] = useState({
         totalProducts: 0,
         totalIngredients: 0,
         avgMargin: 0,
         totalRevenue: 0
     });
+    const [products, setProducts] = useState<any[]>([]);
 
     useEffect(() => {
         fetchStats();
@@ -27,13 +38,15 @@ export function Dashboard() {
                 .from('ingredients')
                 .select('*', { count: 'exact', head: true });
 
-            // Get average margin
-            const { data: products } = await supabase
+            // Get products for margin and health card
+            const prodQuery = supabase
                 .from('product_costs_view')
-                .select('margin_percent');
+                .select('*');
+            if (companyId) prodQuery.eq('company_id', companyId);
+            const { data: prods } = await prodQuery;
 
-            const avgMargin = products && products.length > 0
-                ? products.reduce((acc, p) => acc + Number(p.margin_percent), 0) / products.length
+            const avgMargin = prods && prods.length > 0
+                ? prods.reduce((acc, p) => acc + Number(p.margin_percent || 0), 0) / prods.length
                 : 0;
 
             setStats({
@@ -42,10 +55,45 @@ export function Dashboard() {
                 avgMargin,
                 totalRevenue: 0
             });
+
+            setProducts(prods || []);
         } catch (error) {
             console.error('Error fetching stats:', error);
         }
     }
+
+    // --- Menu health stats (memoized) ---
+    const healthStats = useMemo(() => {
+        if (!products.length || biz.loading) return { inLoss: 0, cmvAboveTarget: 0 };
+
+        let inLoss = 0;
+        let cmvAboveTarget = 0;
+
+        for (const p of products) {
+            const price = Number(p.sale_price) || 0;
+            const cmv = Number(p.cmv) || 0;
+            if (price <= 0) continue;
+
+            const m = computeProductMetrics({
+                cmv,
+                salePrice: price,
+                fixedCostPercent: biz.fixedCostPercent,
+                variableCostPercent: biz.variableCostPercent,
+                desiredProfitPercent: biz.desiredProfitPercent,
+                totalFixedCosts: biz.totalFixedCosts,
+                estimatedMonthlySales: biz.estimatedMonthlySales,
+                averageMonthlyRevenue: biz.averageMonthlyRevenue,
+                channels: biz.channels,
+                fixedCostAllocationMode: biz.fixedCostAllocationMode,
+                targetCmvPercent: biz.targetCmvPercent,
+            });
+
+            if (m.marginStatus === 'danger') inLoss++;
+            if (m.cmvStatus !== 'healthy') cmvAboveTarget++;
+        }
+
+        return { inLoss, cmvAboveTarget };
+    }, [products, biz]);
 
     const cards = [
         {
@@ -107,6 +155,48 @@ export function Dashboard() {
                     </div>
                 ))}
             </div>
+
+            {/* ====== MENU HEALTH CARD (Pro+) ====== */}
+            {canAccess('insights') && products.length > 0 && (healthStats.inLoss > 0 || healthStats.cmvAboveTarget > 0) && (
+                <div className="glass-card overflow-hidden border border-amber-500/20">
+                    <div className="p-5 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-amber-500/10 rounded-xl">
+                                <AlertTriangle size={24} className="text-amber-400" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-white text-lg">Saúde Financeira do Cardápio</h3>
+                                <p className="text-sm text-slate-400 mt-0.5">
+                                    Produtos que precisam de atenção
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => navigate('/cmv-analysis')}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-all"
+                        >
+                            Ver Análise
+                            <ArrowRight size={16} />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 border-t border-slate-700/50">
+                        <div className="p-5 flex items-center gap-4 border-r border-slate-700/50">
+                            <span className="text-3xl font-bold text-red-400">{healthStats.inLoss}</span>
+                            <div>
+                                <p className="text-sm font-medium text-red-300">em prejuízo</p>
+                                <p className="text-xs text-slate-500">margem negativa</p>
+                            </div>
+                        </div>
+                        <div className="p-5 flex items-center gap-4">
+                            <span className="text-3xl font-bold text-amber-400">{healthStats.cmvAboveTarget}</span>
+                            <div>
+                                <p className="text-sm font-medium text-amber-300">CMV acima da meta</p>
+                                <p className="text-xs text-slate-500">acima de {biz.targetCmvPercent ?? 35}%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="glass-card p-8">
                 <h3 className="text-lg font-semibold text-slate-100 mb-4">Bem-vindo ao CMV Control</h3>
