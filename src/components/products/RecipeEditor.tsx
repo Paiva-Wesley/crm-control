@@ -46,7 +46,7 @@ export function RecipeEditor({ productId, productName, salePrice, productSalesQt
         try {
             const [ingredientsRes, recipeRes] = await Promise.all([
                 supabase.from('ingredients').select('*').eq('company_id', companyId).order('name'),
-                supabase.from('product_ingredients').select('*, ingredient:ingredients(*)').eq('product_id', productId)
+                supabase.from('product_ingredients').select('*, ingredient:ingredients(*)').eq('product_id', productId).eq('company_id', companyId)
             ]);
 
             if (ingredientsRes.error) throw ingredientsRes.error;
@@ -102,7 +102,7 @@ export function RecipeEditor({ productId, productName, salePrice, productSalesQt
 
     async function handleRemove(id: number) {
         try {
-            const { error } = await supabase.from('product_ingredients').delete().eq('id', id);
+            const { error } = await supabase.from('product_ingredients').delete().eq('id', id).eq('company_id', companyId);
             if (error) throw error;
             loadData();
         } catch (error) {

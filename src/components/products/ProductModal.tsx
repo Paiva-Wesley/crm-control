@@ -84,7 +84,8 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
         const { data } = await supabase
             .from('product_ingredients')
             .select('*, ingredient:ingredients(*)')
-            .eq('product_id', productId);
+            .eq('product_id', productId)
+            .eq('company_id', companyId);
 
         if (data) {
             const lines = data.map((item: any) => ({
@@ -226,7 +227,8 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                 const { error } = await supabase
                     .from('products')
                     .update(productData)
-                    .eq('id', editingProduct.id);
+                    .eq('id', editingProduct.id)
+                    .eq('company_id', companyId);
 
                 if (error) throw error;
                 productId = editingProduct.id;
@@ -245,7 +247,8 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
             await supabase
                 .from('product_ingredients')
                 .delete()
-                .eq('product_id', productId);
+                .eq('product_id', productId)
+                .eq('company_id', companyId);
 
             if (ingredientLines.length > 0) {
                 const ingredientsToInsert = ingredientLines.map(line => ({

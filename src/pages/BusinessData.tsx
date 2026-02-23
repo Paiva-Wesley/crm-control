@@ -83,7 +83,8 @@ export function BusinessData() {
             // 3. CMV Global (from active products)
             const { data: products } = await supabase
                 .from('product_costs_view')
-                .select('sale_price, cmv, active');
+                .select('sale_price, cmv, active')
+                .eq('company_id', companyId);
 
             let totalCmvPercent = 0;
             let productCount = 0;
@@ -267,8 +268,8 @@ export function BusinessData() {
                             setIsImportModalOpen(true);
                         }}
                         className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all border ${canAccess('import_sales')
-                                ? 'text-slate-300 bg-slate-800 hover:bg-slate-700 border-slate-700'
-                                : 'text-slate-500 bg-slate-800/50 border-slate-700/50 cursor-not-allowed'
+                            ? 'text-slate-300 bg-slate-800 hover:bg-slate-700 border-slate-700'
+                            : 'text-slate-500 bg-slate-800/50 border-slate-700/50 cursor-not-allowed'
                             }`}
                     >
                         {canAccess('import_sales') ? <Upload size={16} /> : <Lock size={16} />}

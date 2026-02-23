@@ -4,6 +4,7 @@ import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { computeProductMetrics, type ProductMetrics } from '../../lib/pricing';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CostSimulatorModalProps {
     isOpen: boolean;
@@ -24,6 +25,7 @@ export function CostSimulatorModal({
     currentSalePrice,
     productId,
 }: CostSimulatorModalProps) {
+    const { companyId } = useAuth();
     const biz = useBusinessSettings();
     const { toast } = useToast();
     const [increasePercent, setIncreasePercent] = useState(10);
@@ -75,7 +77,8 @@ export function CostSimulatorModal({
             const { error } = await supabase
                 .from('products')
                 .update({ sale_price: parseFloat(newIdealPrice.idealMenuPrice.toFixed(2)) })
-                .eq('id', productId);
+                .eq('id', productId)
+                .eq('company_id', companyId);
 
             if (error) throw error;
             toast.success('Preço atualizado com sucesso!');
@@ -109,8 +112,8 @@ export function CostSimulatorModal({
                                 key={p}
                                 onClick={() => setIncreasePercent(p)}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${increasePercent === p
-                                        ? 'bg-primary/20 border-primary/50 text-primary'
-                                        : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-600'
+                                    ? 'bg-primary/20 border-primary/50 text-primary'
+                                    : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-600'
                                     }`}
                             >
                                 +{p}%

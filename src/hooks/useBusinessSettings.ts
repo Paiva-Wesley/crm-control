@@ -129,7 +129,8 @@ export function useBusinessSettings(): BusinessPricingData {
             // 5. Fees (only for per-channel tax rates, NOT for business variable costs)
             const { data: feesData } = await supabase
                 .from('fees')
-                .select('id, percentage');
+                .select('id, percentage')
+                .eq('company_id', companyId);
 
             // 6. Sales Channels with their fees
             const { data: channelsData } = await supabase
@@ -143,7 +144,8 @@ export function useBusinessSettings(): BusinessPricingData {
                     const { data: cfData } = await supabase
                         .from('channel_fees')
                         .select('fee_id')
-                        .eq('channel_id', ch.id);
+                        .eq('channel_id', ch.id)
+                        .eq('company_id', companyId);
 
                     const feeIds = cfData?.map((cf: any) => cf.fee_id) || [];
                     let channelTax = 0;

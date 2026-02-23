@@ -38,7 +38,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
                 const { error } = await supabase
                     .from('products')
                     .update(payload)
-                    .eq('id', product.id);
+                    .eq('id', product.id)
+                    .eq('company_id', companyId);
                 if (error) throw error;
                 onSuccess();
             } else {
@@ -64,7 +65,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             await supabase
                 .from('products')
                 .update({ [field]: value })
-                .eq('id', createdProductId);
+                .eq('id', createdProductId)
+                .eq('company_id', companyId);
 
             // Update local form data
             setFormData(prev => ({ ...prev, [field]: value.toString() }));

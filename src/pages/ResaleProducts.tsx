@@ -29,6 +29,7 @@ export function ResaleProducts() {
     }, []);
 
     async function fetchData() {
+        if (!companyId) return;
         try {
             setLoading(true);
 
@@ -80,7 +81,7 @@ export function ResaleProducts() {
     async function handleSaveProduct(id: number, field: 'cost_price' | 'sale_price', value: number) {
         try {
             if (field === 'sale_price') {
-                await supabase.from('products').update({ sale_price: value }).eq('id', id);
+                await supabase.from('products').update({ sale_price: value }).eq('id', id).eq('company_id', companyId);
             } else {
                 // Update Cost = Update Ingredient
                 // Find Ingredient linked to this product (assuming 1:1 for Bebidas)
@@ -88,10 +89,11 @@ export function ResaleProducts() {
                     .from('product_ingredients')
                     .select('ingredient_id')
                     .eq('product_id', id)
+                    .eq('company_id', companyId)
                     .single();
 
                 if (links) {
-                    await supabase.from('ingredients').update({ cost_per_unit: value }).eq('id', links.ingredient_id);
+                    await supabase.from('ingredients').update({ cost_per_unit: value }).eq('id', links.ingredient_id).eq('company_id', companyId);
                 } else {
                     // Create ingredient if missing (Fallback/Lazy Fix)
                     const product = products.find(p => p.id === id);

@@ -69,14 +69,15 @@ export function Combos() {
                 *,
                 child_product:products!child_product_id (*)
             `)
-            .eq('parent_product_id', comboId);
+            .eq('parent_product_id', comboId)
+            .eq('company_id', companyId);
 
         if (error) {
             console.error('Error fetching combo items:', error);
             return;
         }
 
-        const { data: costs } = await supabase.from('product_costs_view').select('id, cmv');
+        const { data: costs } = await supabase.from('product_costs_view').select('id, cmv').eq('company_id', companyId);
         const costMap = new Map(costs?.map(c => [c.id, c]) || []);
 
         const itemsWithCost = items?.map(item => {
@@ -104,6 +105,7 @@ export function Combos() {
             .select('*')
             .ilike('name', `%${term}%`)
             .eq('is_combo', false)
+            .eq('company_id', companyId)
             .limit(10);
 
         setSearchResults(data || []);
@@ -126,7 +128,7 @@ export function Combos() {
             };
 
             if (comboId) {
-                await supabase.from('products').update(productData).eq('id', comboId);
+                await supabase.from('products').update(productData).eq('id', comboId).eq('company_id', companyId);
             } else {
                 const { data, error } = await supabase.from('products').insert(productData).select().single();
                 if (error) throw error;
@@ -134,7 +136,7 @@ export function Combos() {
             }
 
             // 2. Sync Items
-            await supabase.from('product_combos').delete().eq('parent_product_id', comboId);
+            await supabase.from('product_combos').delete().eq('parent_product_id', comboId).eq('company_id', companyId);
 
             const itemsToInsert = comboItems.map(item => ({
                 parent_product_id: comboId,
@@ -160,7 +162,7 @@ export function Combos() {
 
     async function handleDeleteCombo(id: number) {
         if (!confirm('Tem certeza que deseja excluir este combo?')) return;
-        await supabase.from('products').delete().eq('id', id);
+        await supabase.from('products').delete().eq('id', id).eq('company_id', companyId);
         fetchCombos();
         if (selectedCombo?.id === id) setSelectedCombo(null);
     }

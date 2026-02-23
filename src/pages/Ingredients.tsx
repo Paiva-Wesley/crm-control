@@ -188,7 +188,8 @@ export function Ingredients() {
                 const { error } = await supabase
                     .from('ingredients')
                     .update(payload)
-                    .eq('id', editingId);
+                    .eq('id', editingId)
+                    .eq('company_id', companyId);
                 if (error) throw error;
             } else {
                 const { data, error } = await supabase
@@ -247,7 +248,8 @@ export function Ingredients() {
         const { count } = await supabase
             .from('product_ingredients')
             .select('*', { count: 'exact', head: true })
-            .eq('ingredient_id', id);
+            .eq('ingredient_id', id)
+            .eq('company_id', companyId);
 
         if (count && count > 0) {
             toast.error(`Não é possível excluir: usado em ${count} produto(s)`);
@@ -260,7 +262,8 @@ export function Ingredients() {
             const { error } = await supabase
                 .from('ingredients')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('company_id', companyId);
 
             if (error) throw error;
             toast.success('Insumo excluído');

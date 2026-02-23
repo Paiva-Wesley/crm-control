@@ -50,7 +50,8 @@ export function Channels() {
             const { data } = await supabase
                 .from('channel_fees')
                 .select('fee_id')
-                .eq('channel_id', c.id);
+                .eq('channel_id', c.id)
+                .eq('company_id', companyId);
 
             const associatedFeeIds = data?.map(d => d.fee_id) || [];
             const channelFees = _fees.filter(f => associatedFeeIds.includes(f.id));
@@ -114,7 +115,8 @@ export function Channels() {
         await supabase.from('channel_fees')
             .delete()
             .eq('channel_id', selectedChannel.id)
-            .eq('fee_id', feeId);
+            .eq('fee_id', feeId)
+            .eq('company_id', companyId);
 
         fetchData();
 
