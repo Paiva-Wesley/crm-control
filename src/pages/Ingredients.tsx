@@ -115,6 +115,7 @@ export function Ingredients() {
             const { data, error } = await supabase
                 .from('ingredients')
                 .select('*')
+                .eq('company_id', companyId)
                 .order('name');
 
             if (error) throw error;

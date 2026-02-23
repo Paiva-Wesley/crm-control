@@ -4,6 +4,7 @@ import { Trash2, Plus, Calculator, Utensils, Archive, Package } from 'lucide-rea
 import { supabase } from '../../lib/supabase';
 import type { Ingredient, ProductIngredient } from '../../types';
 import { PricingModal } from './PricingModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface RecipeEditorProps {
     productId: number;
@@ -13,6 +14,7 @@ interface RecipeEditorProps {
 }
 
 export function RecipeEditor({ productId, productName, salePrice, productSalesQty }: RecipeEditorProps) {
+    const { companyId } = useAuth();
     const [items, setItems] = useState<ProductIngredient[]>([]);
     const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
     const [showPricing, setShowPricing] = useState(false);
@@ -43,7 +45,7 @@ export function RecipeEditor({ productId, productName, salePrice, productSalesQt
     async function loadData() {
         try {
             const [ingredientsRes, recipeRes] = await Promise.all([
-                supabase.from('ingredients').select('*').order('name'),
+                supabase.from('ingredients').select('*').eq('company_id', companyId).order('name'),
                 supabase.from('product_ingredients').select('*, ingredient:ingredients(*)').eq('product_id', productId)
             ]);
 

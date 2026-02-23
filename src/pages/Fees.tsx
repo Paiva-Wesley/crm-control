@@ -18,7 +18,7 @@ export function Fees() {
     useEffect(() => { fetchFees(); }, []);
 
     async function fetchFees() {
-        const { data } = await supabase.from('fees').select('*').order('name');
+        const { data } = await supabase.from('fees').select('*').eq('company_id', companyId).order('name');
         setFees(data || []);
     }
 
@@ -43,7 +43,7 @@ export function Fees() {
 
     async function handleDelete(id: number) {
         if (!confirm('Excluir taxa?')) return;
-        const { error } = await supabase.from('fees').delete().eq('id', id);
+        const { error } = await supabase.from('fees').delete().eq('id', id).eq('company_id', companyId);
 
         if (error) {
             toast.error('Erro ao excluir taxa');

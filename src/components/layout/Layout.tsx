@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star, User, Lock } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Calculator, Package, DollarSign, Store, Menu, ChevronDown, ChevronRight, PieChart, Coffee, LogOut, Star, User, Lock, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSubscription } from '../../hooks/useSubscription';
 
@@ -123,6 +123,7 @@ export function Layout() {
     const hasFees = canAccess('fees');
     const hasChannels = canAccess('channels');
     const hasCombos = canAccess('combos');
+    const hasInsights = canAccess('insights');
 
     // Custos group is locked if both fixed and variable costs are locked
     const costGroupLocked = !hasFixedCosts && !hasVariableCosts;
@@ -185,6 +186,15 @@ export function Layout() {
                         <PieChart size={20} />
                         {sidebarOpen && <span>Análise CMV</span>}
                     </NavLink>
+
+                    <GatedNavLink
+                        to="/performance"
+                        icon={TrendingUp}
+                        label="Desempenho"
+                        sidebarOpen={sidebarOpen}
+                        locked={!hasInsights}
+                        badgeLabel="Pro"
+                    />
 
                     <NavLink
                         to="/products"

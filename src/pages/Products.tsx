@@ -1,18 +1,21 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Plus, Search, Trash2, Package } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { ProductWithCost } from '../types';
 import { ProductModal } from '../components/products/ProductModal';
 import { useSubscription } from '../hooks/useSubscription';
+import { useLocation } from 'react-router-dom';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { computeProductMetrics } from '../lib/pricing';
 import { buildInsights, getWorstInsightLevel } from '../lib/insights/buildInsights';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 
 export function Products() {
     const { checkLimit, canAccess, loading: subLoading } = useSubscription();
+    const { companyId } = useAuth();
     const [products, setProducts] = useState<ProductWithCost[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -23,16 +26,48 @@ export function Products() {
 
     const showInsights = canAccess('insights');
 
+    // Highlight support: read ?highlight=ID from URL
+    const location = useLocation();
+    const highlightId = useMemo(() => {
+        const params = new URLSearchParams(location.search);
+        const h = params.get('highlight');
+        return h ? parseInt(h) : null;
+    }, [location.search]);
+    const highlightHandled = useRef(false);
+
     useEffect(() => {
-        fetchProducts();
-    }, []);
+        if (companyId) fetchProducts();
+    }, [companyId]);
+
+    // When products load and highlight is set, scroll and open modal
+    useEffect(() => {
+        if (!highlightId || highlightHandled.current || loading || !products.length) return;
+        const product = products.find(p => p.id === highlightId);
+        if (product) {
+            highlightHandled.current = true;
+            // Scroll to element
+            setTimeout(() => {
+                const el = document.getElementById(`product-row-${highlightId}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-dark-900');
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-dark-900'), 3000);
+                }
+            }, 100);
+            // Open edit modal
+            setEditingProduct(product);
+            setIsModalOpen(true);
+        }
+    }, [highlightId, loading, products]);
 
     async function fetchProducts() {
+        if (!companyId) return;
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from('product_costs_view')
                 .select('*')
+                .eq('company_id', companyId)
                 .order('name');
 
             if (error) throw error;
@@ -103,7 +138,7 @@ export function Products() {
         if (!confirm('Tem certeza que deseja excluir este produto?')) return;
 
         try {
-            const { error } = await supabase.from('products').delete().eq('id', id);
+            const { error } = await supabase.from('products').delete().eq('id', id).eq('company_id', companyId);
             if (error) throw error;
             toast.success('Produto excluído com sucesso');
             fetchProducts(); // Refresh list
@@ -197,6 +232,7 @@ export function Products() {
                                     filteredProducts.map(prod => (
                                         <tr
                                             key={prod.id}
+                                            id={`product-row-${prod.id}`}
                                             className="cursor-pointer transition-colors hover:bg-slate-700/20"
                                             style={{ opacity: prod.active ? 1 : 0.5 }}
                                             onClick={() => handleEdit(prod)}

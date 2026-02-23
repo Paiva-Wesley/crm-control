@@ -37,8 +37,8 @@ export function Channels() {
 
     async function fetchData() {
         const [channelsRes, feesRes] = await Promise.all([
-            supabase.from('sales_channels').select('*'),
-            supabase.from('fees').select('*')
+            supabase.from('sales_channels').select('*').eq('company_id', companyId),
+            supabase.from('fees').select('*').eq('company_id', companyId)
         ]);
 
         const _channels = channelsRes.data || [];
@@ -77,7 +77,7 @@ export function Channels() {
 
     async function handleDeleteChannel(id: number) {
         if (!confirm('Excluir canal?')) return;
-        const { error } = await supabase.from('sales_channels').delete().eq('id', id);
+        const { error } = await supabase.from('sales_channels').delete().eq('id', id).eq('company_id', companyId);
         if (error) {
             toast.error('Erro ao excluir canal');
         } else {

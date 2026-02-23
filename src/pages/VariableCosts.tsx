@@ -125,7 +125,7 @@ export function VariableCosts() {
     async function handleDelete(id: string) {
         if (!confirm('Excluir este custo variável?')) return;
         try {
-            const { error } = await supabase.from('variable_costs').delete().eq('id', id);
+            const { error } = await supabase.from('variable_costs').delete().eq('id', id).eq('company_id', companyId);
             if (error) throw error;
             toast.success('Custo excluído');
             fetchItems();

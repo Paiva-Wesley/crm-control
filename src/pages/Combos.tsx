@@ -49,6 +49,7 @@ export function Combos() {
             const { data, error } = await supabase
                 .from('product_costs_view')
                 .select('*')
+                .eq('company_id', companyId)
                 .eq('is_combo', true)
                 .order('name');
 

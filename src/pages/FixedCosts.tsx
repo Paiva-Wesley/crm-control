@@ -106,7 +106,7 @@ export function FixedCosts() {
         // Optimistic update
         setCosts(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
         try {
-            await supabase.from('fixed_costs').update(updates).eq('id', id);
+            await supabase.from('fixed_costs').update(updates).eq('id', id).eq('company_id', companyId);
         } catch (error) {
             console.error('Error updating cost:', error);
         }
@@ -117,7 +117,7 @@ export function FixedCosts() {
         setCosts(prev => prev.filter(c => c.id !== id));
 
         try {
-            const { error } = await supabase.from('fixed_costs').delete().eq('id', id);
+            const { error } = await supabase.from('fixed_costs').delete().eq('id', id).eq('company_id', companyId);
             if (error) throw error;
             toast.success('Custo excluído');
         } catch (error) {

@@ -24,19 +24,22 @@ export function Dashboard() {
 
     useEffect(() => {
         fetchStats();
-    }, []);
+    }, [companyId]);
 
     async function fetchStats() {
+        if (!companyId) return;
         try {
             // Count products
             const { count: productsCount } = await supabase
                 .from('products')
-                .select('*', { count: 'exact', head: true });
+                .select('*', { count: 'exact', head: true })
+                .eq('company_id', companyId);
 
             // Count ingredients
             const { count: ingredientsCount } = await supabase
                 .from('ingredients')
-                .select('*', { count: 'exact', head: true });
+                .select('*', { count: 'exact', head: true })
+                .eq('company_id', companyId);
 
             // Get products for margin and health card
             const prodQuery = supabase
