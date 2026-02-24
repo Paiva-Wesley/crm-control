@@ -8,6 +8,7 @@ import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { useSubscription } from '../hooks/useSubscription';
 import { ImportSalesModal } from '../components/business/ImportSalesModal';
 import { useNavigate } from 'react-router-dom';
+import { formatMoney } from '../lib/formatMoney';
 
 interface BusinessSettingsExtended extends BusinessSettings {
     monthly_revenue: Record<string, number>;
@@ -230,8 +231,7 @@ export function BusinessData() {
 
 
     // --- Helper for formatting currency ---
-    const formatCurrency = (val: number) =>
-        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    const formatCurrency = (val: number) => `R$ ${formatMoney(val)}`;
 
     // --- Color Logic for Contribution Margin ---
     let marginColorClass = 'text-white';

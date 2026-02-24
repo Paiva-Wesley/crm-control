@@ -5,6 +5,7 @@ import { computeProductMetrics, type ProductMetrics } from '../../lib/pricing';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatMoney } from '../../lib/formatMoney';
 
 interface CostSimulatorModalProps {
     isOpen: boolean;
@@ -70,7 +71,7 @@ export function CostSimulatorModal({
 
     async function handleApplyPrice() {
         if (!productId) return;
-        if (!confirm(`Deseja atualizar o preço de venda para R$ ${newIdealPrice.idealMenuPrice.toFixed(2)}?`)) return;
+        if (!confirm(`Deseja atualizar o preço de venda para R$ ${formatMoney(newIdealPrice.idealMenuPrice)}?`)) return;
 
         try {
             setApplying(true);
@@ -143,8 +144,8 @@ export function CostSimulatorModal({
 
                         {/* CMV */}
                         <div className="p-3 text-slate-400 border-b border-slate-700/30">CMV (R$)</div>
-                        <div className="p-3 text-center text-white border-b border-l border-slate-700/30">R$ {currentCmv.toFixed(2)}</div>
-                        <div className="p-3 text-center text-amber-300 font-medium border-b border-l border-slate-700/30">R$ {simulatedCmv.toFixed(2)}</div>
+                        <div className="p-3 text-center text-white border-b border-l border-slate-700/30">R$ {formatMoney(currentCmv)}</div>
+                        <div className="p-3 text-center text-amber-300 font-medium border-b border-l border-slate-700/30">R$ {formatMoney(simulatedCmv)}</div>
 
                         {/* CMV % */}
                         <div className="p-3 text-slate-400 border-b border-slate-700/30">CMV %</div>
@@ -158,12 +159,12 @@ export function CostSimulatorModal({
                         {/* Lucro */}
                         <div className="p-3 text-slate-400 border-b border-slate-700/30">Lucro (R$)</div>
                         <div className={`p-3 text-center font-medium border-b border-l border-slate-700/30 ${statusColor(currentMetrics.marginStatus)}`}>
-                            R$ {currentMetrics.profitValue.toFixed(2)}
+                            R$ {formatMoney(currentMetrics.profitValue)}
                         </div>
                         <div className={`p-3 text-center font-medium border-b border-l border-slate-700/30 ${statusColor(simMetrics.marginStatus)}`}>
-                            R$ {simMetrics.profitValue.toFixed(2)}
+                            R$ {formatMoney(simMetrics.profitValue)}
                             <span className="block text-xs text-red-400 mt-0.5">
-                                ({profitDiff >= 0 ? '+' : ''}R$ {profitDiff.toFixed(2)})
+                                ({profitDiff >= 0 ? '+' : ''}R$ {formatMoney(profitDiff)})
                             </span>
                         </div>
 
@@ -187,10 +188,10 @@ export function CostSimulatorModal({
                         <div>
                             <p className="text-sm text-slate-400">Novo Preço Ideal (com custo +{increasePercent}%)</p>
                             <p className="text-2xl font-bold text-emerald-400 mt-1">
-                                R$ {newIdealPrice.idealMenuPrice.toFixed(2)}
+                                R$ {formatMoney(newIdealPrice.idealMenuPrice)}
                             </p>
                             <p className="text-xs text-slate-500 mt-1">
-                                Atual: R$ {currentSalePrice.toFixed(2)} → Diferença: R$ {(newIdealPrice.idealMenuPrice - currentSalePrice).toFixed(2)}
+                                Atual: R$ {formatMoney(currentSalePrice)} → Diferença: R$ {formatMoney(newIdealPrice.idealMenuPrice - currentSalePrice)}
                             </p>
                         </div>
                         {productId && (

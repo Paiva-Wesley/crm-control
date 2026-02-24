@@ -7,6 +7,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { computeProductMetrics } from '../lib/pricing';
 import { useAuth } from '../contexts/AuthContext';
+import { formatMoney } from '../lib/formatMoney';
 
 export function Dashboard() {
     const navigate = useNavigate();
@@ -122,7 +123,7 @@ export function Dashboard() {
         },
         {
             title: 'Receita Estimada',
-            value: `R$ ${stats.totalRevenue.toFixed(2)}`,
+            value: `R$ ${formatMoney(stats.totalRevenue)}`,
             icon: DollarSign,
             color: 'text-amber-400',
             bgColor: 'bg-amber-500/10'

@@ -6,6 +6,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { computeIdealMenuPrice, computeAllChannelPrices, computeProductMetrics } from '../../lib/pricing';
 import type { Product, Ingredient } from '../../types';
+import { formatMoney } from '../../lib/formatMoney';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -491,7 +492,7 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                                                             >
                                                                 <span>{ing.name}</span>
                                                                 <span className="text-slate-400 text-xs">
-                                                                    R$ {ing.cost_per_unit.toFixed(2)}/{ing.unit}
+                                                                    R$ {formatMoney(ing.cost_per_unit)}/{ing.unit}
                                                                 </span>
                                                             </button>
                                                         ))}
@@ -528,7 +529,7 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                                         <div className="w-28 text-right">
                                             <p className="text-sm text-slate-400">Custo</p>
                                             <p className="text-white font-medium">
-                                                R$ {((line.quantity || 0) * (line.cost_per_unit || 0)).toFixed(2)}
+                                                R$ {formatMoney((line.quantity || 0) * (line.cost_per_unit || 0))}
                                             </p>
                                         </div>
 
@@ -558,7 +559,7 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                                 <div className="flex justify-end items-center gap-4 pt-4 border-t border-dark-700">
                                     <span className="text-slate-400">Custo Total da Ficha Técnica:</span>
                                     <span className="text-2xl font-bold text-primary">
-                                        R$ {totalCost.toFixed(2)}
+                                        R$ {formatMoney(totalCost)}
                                     </span>
                                 </div>
                             )}
@@ -589,7 +590,7 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                                 <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
                                     <p className="text-sm text-slate-400 mb-1">Preço Sugerido</p>
                                     <p className="text-2xl font-bold text-primary">
-                                        R$ {suggestedPrice.toFixed(2)}
+                                        R$ {formatMoney(suggestedPrice)}
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1">
                                         Markup: {biz.markup > 0 ? biz.markup.toFixed(2) + 'x' : 'N/A'} (CMV × Markup)
@@ -653,7 +654,7 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                                             <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
                                                 <p className="text-sm text-slate-400 mb-1">Lucro Estimado</p>
                                                 <p className={`text-lg font-semibold ${profitColor}`}>
-                                                    R$ {m.profitValue.toFixed(2)} ({m.profitPercent.toFixed(1)}%)
+                                                    R$ {formatMoney(m.profitValue)} ({m.profitPercent.toFixed(1)}%)
                                                 </p>
                                                 <p className="text-[10px] text-slate-600">
                                                     Custo fixo: {m.fixedCostMethod === 'revenue_based' ? 'faturamento' : 'por unidade'}
@@ -692,12 +693,12 @@ export function ProductModal({ isOpen, onClose, editingProduct }: ProductModalPr
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between text-sm">
                                                         <span className="text-emerald-400">Cardápio Próprio</span>
-                                                        <span className="font-bold text-emerald-400">R$ {suggestedPrice.toFixed(2)}</span>
+                                                        <span className="font-bold text-emerald-400">R$ {formatMoney(suggestedPrice)}</span>
                                                     </div>
                                                     {computeAllChannelPrices(suggestedPrice, biz.channels).map(cp => (
                                                         <div key={cp.channelId} className="flex justify-between text-sm">
                                                             <span className="text-slate-300">{cp.channelName} <span className="text-xs text-slate-500">({cp.totalTaxRate.toFixed(1)}%)</span></span>
-                                                            <span className="font-bold text-blue-400">R$ {cp.idealPrice.toFixed(2)}</span>
+                                                            <span className="font-bold text-blue-400">R$ {formatMoney(cp.idealPrice)}</span>
                                                         </div>
                                                     ))}
                                                 </div>

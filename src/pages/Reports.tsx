@@ -3,9 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { buildMonthlyKpis, type MonthlyKpi } from '../lib/reports/monthlyKpis';
 import { TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { formatMoney } from '../lib/formatMoney';
 
 function formatCurrency(value: number) {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    return `R$ ${formatMoney(value)}`;
 }
 
 function formatPercent(value: number | null) {

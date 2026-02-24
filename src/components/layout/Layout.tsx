@@ -55,15 +55,25 @@ interface GatedNavLinkProps {
     sidebarOpen: boolean;
     locked?: boolean;
     badgeLabel?: string;
+    loading?: boolean;
 }
 
-function GatedNavLink({ to, icon: Icon, label, sidebarOpen, locked, badgeLabel }: GatedNavLinkProps) {
+function GatedNavLink({ to, icon: Icon, label, sidebarOpen, locked, badgeLabel, loading }: GatedNavLinkProps) {
     const navigate = useNavigate();
 
-    if (locked) {
+    // Enquanto loading, renderizamos como link normal para não "piscar", 
+    // mas evitamos a ação click se por acaso já soubermos que está locked previamente, 
+    // ou apenas deixamos passar e o FeatureRoute cuida do bloqueio real.
+    // A recomendação: "renderizar sempre o Link normal" e o route barra se precisar.
+
+    if (locked && !loading) {
         return (
             <button
-                onClick={() => navigate('/plans')}
+                type="button"
+                onClick={(e) => {
+                    e.preventDefault();
+                    navigate('/plans');
+                }}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 cursor-not-allowed transition-colors duration-200 w-full text-left hover:bg-dark-700/50"
             >
                 <Icon size={20} />
@@ -100,7 +110,7 @@ export function Layout() {
     const location = useLocation();
     const [openGroup, setOpenGroup] = useState<string | null>(null);
     const { signOut, user, companyName } = useAuth();
-    const { canAccess } = useSubscription();
+    const { canAccess, loading: subLoading } = useSubscription();
 
     React.useEffect(() => {
         const path = location.pathname;
@@ -194,6 +204,7 @@ export function Layout() {
                         sidebarOpen={sidebarOpen}
                         locked={!hasInsights}
                         badgeLabel="Pro"
+                        loading={subLoading}
                     />
 
                     <GatedNavLink
@@ -203,6 +214,7 @@ export function Layout() {
                         sidebarOpen={sidebarOpen}
                         locked={!hasInsights}
                         badgeLabel="Pro"
+                        loading={subLoading}
                     />
 
                     <NavLink
@@ -235,6 +247,7 @@ export function Layout() {
                         sidebarOpen={sidebarOpen}
                         locked={!hasCombos}
                         badgeLabel="Pro"
+                        loading={subLoading}
                     />
 
                     {/* Group: Itens */}
@@ -355,6 +368,7 @@ export function Layout() {
                         sidebarOpen={sidebarOpen}
                         locked={!hasFees}
                         badgeLabel="Pro"
+                        loading={subLoading}
                     />
 
                     {/* Canais - Gated */}
@@ -365,6 +379,7 @@ export function Layout() {
                         sidebarOpen={sidebarOpen}
                         locked={!hasChannels}
                         badgeLabel="Pro"
+                        loading={subLoading}
                     />
 
                     <NavLink

@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Plus, Search, Edit2, Trash2, Utensils, Calculator, Beaker, Box, Save, Layers, X } from 'lucide-react';
+import { Plus, Search, Trash2, Utensils, Calculator, Beaker, Box, Save, Layers, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Ingredient } from '../types';
+import { formatMoney } from '../lib/formatMoney';
 import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
@@ -391,13 +392,13 @@ export function Ingredients() {
                 <div className="glass-card p-4">
                     <p className="text-sm text-slate-400">Custo Médio</p>
                     <p className="text-2xl font-bold text-emerald-400">
-                        R$ {stats.avgCost.toFixed(2)}
+                        R$ {formatMoney(stats.avgCost)}
                     </p>
                 </div>
                 <div className="glass-card p-4">
                     <p className="text-sm text-slate-400">Soma dos Custos</p>
                     <p className="text-2xl font-bold text-blue-400">
-                        R$ {stats.totalValue.toFixed(2)}
+                        R$ {formatMoney(stats.totalValue)}
                     </p>
                 </div>
             </div>
@@ -479,7 +480,11 @@ export function Ingredients() {
                                                 : ing.cost_per_unit;
 
                                         return (
-                                            <tr key={ing.id} className="hover:bg-slate-700/20 transition-colors">
+                                            <tr
+                                                key={ing.id}
+                                                className="cursor-pointer hover:bg-slate-700/20 transition-colors"
+                                                onClick={() => handleEdit(ing)}
+                                            >
                                                 <td>
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-semibold text-slate-100">{ing.name}</p>
@@ -507,27 +512,18 @@ export function Ingredients() {
                                                     </span>
                                                 </td>
                                                 <td className="text-right text-slate-300">
-                                                    R$ {Number(ing.cost_per_unit).toFixed(4)}
+                                                    R$ {formatMoney(Number(ing.cost_per_unit))}
                                                 </td>
                                                 <td className="text-right">
                                                     <span className="text-emerald-400">
-                                                        R$ {normalizedCost.toFixed(4)}
+                                                        R$ {formatMoney(normalizedCost)}
                                                     </span>
                                                     <span className="text-xs text-slate-500 ml-1">
                                                         /{ing.unit === 'kg' || ing.unit === 'g' ? '100g' : 'un'}
                                                     </span>
                                                 </td>
-                                                <td className="text-right">
+                                                <td className="text-right" onClick={e => e.stopPropagation()}>
                                                     <div className="flex justify-end gap-2 text-right">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleEdit(ing)}
-                                                            className="h-8 w-8 p-0"
-                                                            title="Editar"
-                                                        >
-                                                            <Edit2 size={18} />
-                                                        </Button>
                                                         <Button
                                                             variant="danger"
                                                             size="sm"
@@ -661,7 +657,7 @@ export function Ingredients() {
                                                     <option value="">Selecione um insumo...</option>
                                                     {availableChildIngredients.map(ing => (
                                                         <option key={ing.id} value={ing.id}>
-                                                            {ing.name} (R$ {Number(ing.cost_per_unit).toFixed(4)}/{ing.unit})
+                                                            {ing.name} (R$ {formatMoney(Number(ing.cost_per_unit))}/{ing.unit})
                                                         </option>
                                                     ))}
                                                 </select>
@@ -679,7 +675,7 @@ export function Ingredients() {
                                                     )}
                                                 </div>
                                                 <span className="text-xs text-emerald-400 w-24 text-right whitespace-nowrap">
-                                                    R$ {lineCost.toFixed(4)}
+                                                    R$ {formatMoney(lineCost)}
                                                 </span>
                                                 <button
                                                     type="button"
@@ -698,7 +694,7 @@ export function Ingredients() {
                             <div className="flex items-center justify-between pt-3 border-t border-purple-500/20">
                                 <span className="text-sm font-medium text-slate-400">Custo Total da Receita:</span>
                                 <span className="text-lg font-bold text-purple-400">
-                                    R$ {compositeCost.toFixed(4)}
+                                    R$ {formatMoney(compositeCost)}
                                 </span>
                             </div>
 
@@ -741,7 +737,7 @@ export function Ingredients() {
                                     <div className="flex items-center justify-between pt-2 border-t border-amber-500/20">
                                         <span className="text-sm text-slate-400">Custo por {formData.unit}:</span>
                                         <span className="text-lg font-bold text-amber-400">
-                                            R$ {(compositeCost / parseFloat(formData.yield_quantity)).toFixed(4)}
+                                            R$ {formatMoney(compositeCost / parseFloat(formData.yield_quantity))}
                                         </span>
                                     </div>
                                 )}
@@ -797,7 +793,7 @@ export function Ingredients() {
                             <div className="flex items-center justify-between pt-3 border-t border-dark-600">
                                 <span className="text-sm text-slate-400">Custo Calculado:</span>
                                 <span className="text-lg font-bold text-primary">
-                                    R$ {formData.cost_per_unit || '0.0000'}
+                                    R$ {formData.cost_per_unit ? formatMoney(parseFloat(formData.cost_per_unit)) : formatMoney(0)}
                                 </span>
                             </div>
                         </div>

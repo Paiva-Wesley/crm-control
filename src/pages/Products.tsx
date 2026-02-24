@@ -8,6 +8,7 @@ import { useLocation } from 'react-router-dom';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { computeProductMetrics } from '../lib/pricing';
 import { buildInsights, getWorstInsightLevel } from '../lib/insights/buildInsights';
+import { formatMoney } from '../lib/formatMoney';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../contexts/AuthContext';
@@ -251,8 +252,8 @@ export function Products() {
                                                 </span>
                                             </td>
                                             <td>{prod.category || '-'}</td>
-                                            <td>R$ {Number(prod.sale_price).toFixed(2)}</td>
-                                            <td className="text-slate-400">R$ {Number(prod.cmv).toFixed(2)}</td>
+                                            <td>R$ {formatMoney(Number(prod.sale_price))}</td>
+                                            <td className="text-slate-400">R$ {formatMoney(Number(prod.cmv))}</td>
                                             {/* CMV % and Lucro Estimado via pricing engine */}
                                             {(() => {
                                                 const price = Number(prod.sale_price) || 0;
@@ -285,7 +286,7 @@ export function Products() {
                                                         </td>
                                                         <td>
                                                             <span className={`font-semibold ${profitColor}`}>
-                                                                R$ {m.profitValue.toFixed(2)}
+                                                                R$ {formatMoney(m.profitValue)}
                                                             </span>
                                                             <span className={`block text-xs mt-0.5 ${profitColor} opacity-70`}>
                                                                 {m.profitPercent.toFixed(1)}%

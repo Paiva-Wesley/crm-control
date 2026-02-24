@@ -8,6 +8,7 @@ import { computeProductMetrics } from '../lib/pricing';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { buildInsights, type Insight } from '../lib/insights/buildInsights';
+import { formatMoney } from '../lib/formatMoney';
 
 export function CmvAnalysis() {
     const [loading, setLoading] = useState(true);
@@ -294,7 +295,7 @@ export function CmvAnalysis() {
                     </div>
                     <div className="flex items-baseline gap-2">
                         <h3 className="text-2xl font-bold text-white mb-1">
-                            R$ {metricsData.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            R$ {formatMoney(metricsData.totalRevenue)}
                         </h3>
                     </div>
                     <p className="text-xs text-slate-500 mt-2">Receita Total</p>
@@ -321,7 +322,7 @@ export function CmvAnalysis() {
                         <DollarSign className="text-emerald-500 opacity-80" size={20} />
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-1">
-                        R$ {metricsData.estimatedProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        R$ {formatMoney(metricsData.estimatedProfit)}
                     </h3>
                     <p className="text-xs text-slate-500 mt-2">Lucro Líquido Est.</p>
                 </div>
@@ -393,8 +394,8 @@ export function CmvAnalysis() {
                                         <div
                                             key={insight.key}
                                             className={`flex items-start gap-2 text-sm ${insight.level === 'danger' ? 'text-red-300' :
-                                                    insight.level === 'warning' ? 'text-amber-300' :
-                                                        'text-blue-300'
+                                                insight.level === 'warning' ? 'text-amber-300' :
+                                                    'text-blue-300'
                                                 }`}
                                         >
                                             <span className="shrink-0 mt-0.5">
@@ -470,14 +471,14 @@ export function CmvAnalysis() {
                                 <tr key={product.id} className="hover:bg-slate-700/20 transition-colors">
                                     <td className="pl-6 font-medium text-slate-200">{product.name}</td>
                                     <td className="text-right text-slate-300">{product.salesQty}</td>
-                                    <td className="text-right text-slate-300">R$ {product.salesAvgPrice.toFixed(2)}</td>
-                                    <td className="text-right text-slate-300">R$ {product.revenue.toFixed(2)}</td>
-                                    <td className="text-right text-slate-300">R$ {product.cost.toFixed(2)}</td>
+                                    <td className="text-right text-slate-300">R$ {formatMoney(product.salesAvgPrice)}</td>
+                                    <td className="text-right text-slate-300">R$ {formatMoney(product.revenue)}</td>
+                                    <td className="text-right text-slate-300">R$ {formatMoney(product.cost)}</td>
                                     <td className="text-right font-bold text-slate-300">
                                         {product.cmv.toFixed(1)}%
                                     </td>
                                     <td className="text-right text-emerald-300 font-medium">
-                                        R$ {(product.estimatedProfit || 0).toFixed(2)}
+                                        R$ {formatMoney(product.estimatedProfit || 0)}
                                     </td>
                                     <td className="text-right font-bold text-emerald-300">
                                         {(product.estimatedMarginPercent || 0).toFixed(1)}%
