@@ -129,6 +129,7 @@ export interface Sale {
     quantity: number;
     sale_price: number;
     sold_at: string;
+    import_batch_id?: string;
 }
 
 export interface PlanLimits {
