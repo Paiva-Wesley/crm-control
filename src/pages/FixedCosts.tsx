@@ -8,18 +8,16 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../contexts/ToastContext';
 
-// Grouping for Tabs
 type GroupTab = 'Equipe' | 'Despesas';
 
 export function FixedCosts() {
     const [loading, setLoading] = useState(true);
     const { companyId } = useAuth();
     const [costs, setCosts] = useState<FixedCost[]>([]);
-    const [products, setProducts] = useState<Product[]>([]); // For snack linking
+    const [products, setProducts] = useState<Product[]>([]);
     const [activeTab, setActiveTab] = useState<GroupTab>('Equipe');
     const { toast } = useToast();
 
-    // Accordion State
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
         'CLT': true, 'Freelancer': true, 'Motoboys': true, 'Lanche': true, 'ProLabore': true,
         'Operacional': true, 'Geral': true
@@ -47,7 +45,6 @@ export function FixedCosts() {
                 supabase.from('products').select('*').eq('active', true).eq('company_id', companyId).order('name')
             ]);
 
-            // Fetch costs from view
             const { data: costsView } = await supabase.from('product_costs_view').select('id, cmv').eq('company_id', companyId);
             const costMap: Record<number, number> = {};
             costsView?.forEach((c: any) => {
@@ -56,14 +53,12 @@ export function FixedCosts() {
 
             if (costsRes.error) throw costsRes.error;
 
-            // Ensure numeric values are parsed (Supabase returns numeric as string)
             const parsedCosts = (costsRes.data || []).map(c => ({
                 ...c,
                 monthly_value: parseFloat(c.monthly_value as any) || 0
             }));
 
             setCosts(parsedCosts);
-            // Attach cost to products for easier access
             const productsWithCost = (productsRes.data || []).map(p => ({
                 ...p,
                 cost_price_view: costMap[p.id] || 0
@@ -75,8 +70,6 @@ export function FixedCosts() {
             setLoading(false);
         }
     }
-
-    // --- Action Handlers ---
 
     async function handleAddCost(category: string, initialConfig: any = {}) {
         const defaultName = category.includes('CLT') ? 'Novo Funcionário' :
@@ -93,7 +86,6 @@ export function FixedCosts() {
 
             if (error) throw error;
             setCosts(prev => [...prev, data]);
-            // Ensure section is open
             setOpenSections(prev => ({ ...prev, [category]: true }));
             toast.success('Item adicionado');
         } catch (error) {
@@ -103,7 +95,6 @@ export function FixedCosts() {
     }
 
     async function handleUpdateCost(id: number, updates: Partial<FixedCost>) {
-        // Optimistic update
         setCosts(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
         try {
             await supabase.from('fixed_costs').update(updates).eq('id', id).eq('company_id', companyId);
@@ -127,11 +118,9 @@ export function FixedCosts() {
         }
     }
 
-    // --- Calculation Logic ---
-
     function updateCLT(cost: FixedCost, baseSalary: number) {
         const thirteenth = baseSalary / 12;
-        const vacation = (baseSalary + (baseSalary / 3)) / 12; // 1/3 constitutional
+        const vacation = (baseSalary + (baseSalary / 3)) / 12;
         const fgts = baseSalary * 0.08;
         const total = baseSalary + thirteenth + vacation + fgts;
 
@@ -155,14 +144,12 @@ export function FixedCosts() {
         if (mode === 'manual') {
             newVal = (value || 0) * (days || 1);
         } else {
-            // Fetch product cost
             const prod = products.find(p => p.id === productId);
             if (prod) {
                 const unitCost = (prod as any).cost_price_view || 0;
                 newVal = unitCost * (days || 0);
                 newConfig.unit_cost = unitCost;
             } else {
-                // Determine logic if product not found (keep old or zero)
                 newVal = 0;
             }
         }
@@ -190,10 +177,6 @@ export function FixedCosts() {
         });
     }
 
-    // --- Helper for Filtering ---
-
-    // Some costs might have categories not in our static list (legacy compatibility)
-    // We group them by tab based on known logic.
     function getCostsForTab(tab: GroupTab) {
         if (tab === 'Equipe') {
             return costs.filter(c =>
@@ -245,7 +228,6 @@ export function FixedCosts() {
                 <span className="text-3xl font-bold text-white">R$ {totalTabCosts.toFixed(2)}</span>
             </div>
 
-            {/* --- EQUITY TAB CONTENT --- */}
             {activeTab === 'Equipe' && (
                 <div className="space-y-6">
 
@@ -259,43 +241,50 @@ export function FixedCosts() {
                         costs={costs.filter(c => c.category === 'Salários CLT' || c.category === 'CLT')}
                         totalValue={costs.filter(c => c.category === 'Salários CLT' || c.category === 'CLT').reduce((acc, c) => acc + c.monthly_value, 0)}
                     >
-                        <table className="data-table text-sm">
-                            <thead>
-                                <tr>
-                                    <th className="pl-4">Funcionário</th>
-                                    <th className="text-right">Salário Base</th>
-                                    <th className="text-right">Encargos (13º/Férias/FGTS)</th>
-                                    <th className="text-right">Total Mensal</th>
-                                    <th className="w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div className="w-full text-sm">
+                            {/* Header (Desktop Only) */}
+                            <div className="hidden md:grid grid-cols-[1fr_120px_200px_120px_40px] gap-4 px-4 py-3 bg-dark-900/50 text-slate-400 font-medium rounded-t-lg">
+                                <div>Funcionário</div>
+                                <div className="text-right">Salário Base</div>
+                                <div className="text-right">Encargos (13º/Férias/FGTS)</div>
+                                <div className="text-right">Total Mensal</div>
+                                <div className="w-10"></div>
+                            </div>
+
+                            {/* Body Rows */}
+                            <div className="divide-y divide-dark-700/50 border border-dark-700/50 rounded-b-lg (md:rounded-t-none md:border-t-0 border-t md:border-t-0)">
                                 {costs.filter(c => c.category === 'Salários CLT' || c.category === 'CLT').map(cost => (
-                                    <tr key={cost.id} className="border-b border-dark-700/50 hover:bg-dark-700/30 group">
-                                        <td className="py-2 pl-2">
+                                    <div key={cost.id} className="grid grid-cols-1 md:grid-cols-[1fr_120px_200px_120px_40px] gap-2 md:gap-4 items-center p-3 md:p-4 hover:bg-dark-700/30 group transition-colors">
+                                        <div className="flex flex-col md:block">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Funcionário</span>
                                             <input
-                                                className="bg-transparent border-none focus:ring-0 text-white w-full placeholder-slate-600"
+                                                className="bg-transparent border-none focus:ring-0 text-white w-full placeholder-slate-600 p-0"
                                                 value={cost.name}
                                                 onChange={e => handleUpdateCost(cost.id, { name: e.target.value })}
                                                 placeholder="Nome do Funcionário"
                                             />
-                                        </td>
-                                        <td className="py-2 text-right">
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Salário Base</span>
                                             <input
                                                 type="number"
-                                                className="input w-24 text-right py-1 h-8"
+                                                className="input w-full md:w-24 text-left md:text-right py-1 h-8"
                                                 value={cost.config?.base_salary || ''}
                                                 onChange={e => updateCLT(cost, parseFloat(e.target.value) || 0)}
                                             />
-                                        </td>
-                                        <td className="py-2 text-right text-slate-400 text-xs">
-                                            <div className="flex flex-col items-end">
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end text-slate-400 text-xs">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Encargos</span>
+                                            <div className="flex flex-col items-start md:items-end">
                                                 <span>Total: R$ {((cost.config?.thirteenth || 0) + (cost.config?.vacation || 0) + (cost.config?.fgts || 0)).toFixed(2)}</span>
                                                 <span className="opacity-50 text-[10px]">13º: {cost.config?.thirteenth?.toFixed(0)} | Fér: {cost.config?.vacation?.toFixed(0)} | FGTS: {cost.config?.fgts?.toFixed(0)}</span>
                                             </div>
-                                        </td>
-                                        <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
-                                        <td className="py-2 text-center">
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Total Mensal</span>
+                                            <span className="font-bold text-white md:text-right w-full block">R$ {cost.monthly_value.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-end md:justify-center mt-2 md:mt-0">
                                             <Button
                                                 variant="danger"
                                                 size="sm"
@@ -304,11 +293,11 @@ export function FixedCosts() {
                                             >
                                                 <Trash2 size={14} />
                                             </Button>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
+                            </div>
+                        </div>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -330,41 +319,47 @@ export function FixedCosts() {
                         costs={costs.filter(c => c.category === 'Salários Freelancer' || c.category === 'Freelancer')}
                         totalValue={costs.filter(c => c.category === 'Salários Freelancer' || c.category === 'Freelancer').reduce((acc, c) => acc + c.monthly_value, 0)}
                     >
-                        <table className="data-table text-sm">
-                            <thead>
-                                <tr>
-                                    <th className="pl-4">Função / Pessoa</th>
-                                    <th className="text-right">Diária</th>
-                                    <th className="text-right">Qtd Pessoas</th>
-                                    <th className="text-right">Dias/Mês</th>
-                                    <th className="text-right">Total</th>
-                                    <th className="w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div className="w-full text-sm">
+                            <div className="hidden md:grid grid-cols-[1fr_100px_100px_100px_120px_40px] gap-4 px-4 py-3 bg-dark-900/50 text-slate-400 font-medium rounded-t-lg">
+                                <div>Função / Pessoa</div>
+                                <div className="text-right">Diária</div>
+                                <div className="text-right">Qtd Pessoas</div>
+                                <div className="text-right">Dias/Mês</div>
+                                <div className="text-right">Total</div>
+                                <div className="w-10"></div>
+                            </div>
+
+                            <div className="divide-y divide-dark-700/50 border border-dark-700/50 rounded-b-lg (md:rounded-t-none md:border-t-0 border-t md:border-t-0)">
                                 {costs.filter(c => c.category === 'Salários Freelancer' || c.category === 'Freelancer').map(cost => (
-                                    <tr key={cost.id} className="border-b border-dark-700/50 hover:bg-dark-700/30 group">
-                                        <td className="py-2 pl-2">
+                                    <div key={cost.id} className="grid grid-cols-1 md:grid-cols-[1fr_100px_100px_100px_120px_40px] gap-2 md:gap-4 items-center p-3 md:p-4 hover:bg-dark-700/30 group transition-colors">
+                                        <div className="flex flex-col md:block">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Função / Pessoa</span>
                                             <input
-                                                className="bg-transparent border-none focus:ring-0 text-white w-full"
+                                                className="bg-transparent border-none focus:ring-0 text-white w-full p-0"
                                                 value={cost.name}
                                                 onChange={e => handleUpdateCost(cost.id, { name: e.target.value })}
                                             />
-                                        </td>
-                                        <td className="py-2 text-right">
-                                            <input type="number" className="input w-20 text-right py-1 h-8"
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Diária</span>
+                                            <input type="number" className="input w-full md:w-20 text-left md:text-right py-1 h-8"
                                                 value={cost.config?.daily_rate || ''} onChange={e => updateFreightOrFreelancer(cost, 'daily_rate', parseFloat(e.target.value))} />
-                                        </td>
-                                        <td className="py-2 text-right">
-                                            <input type="number" className="input w-16 text-right py-1 h-8"
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Qtd Pessoas</span>
+                                            <input type="number" className="input w-full md:w-16 text-left md:text-right py-1 h-8"
                                                 value={cost.config?.qty_people || ''} onChange={e => updateFreightOrFreelancer(cost, 'qty_people', parseFloat(e.target.value))} />
-                                        </td>
-                                        <td className="py-2 text-right">
-                                            <input type="number" className="input w-16 text-right py-1 h-8"
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Dias/Mês</span>
+                                            <input type="number" className="input w-full md:w-16 text-left md:text-right py-1 h-8"
                                                 value={cost.config?.days_worked || ''} onChange={e => updateFreightOrFreelancer(cost, 'days_worked', parseFloat(e.target.value))} />
-                                        </td>
-                                        <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
-                                        <td className="py-2 text-center">
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Total</span>
+                                            <span className="font-bold text-white md:text-right w-full block">R$ {cost.monthly_value.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-end md:justify-center mt-2 md:mt-0">
                                             <Button
                                                 variant="danger"
                                                 size="sm"
@@ -373,11 +368,11 @@ export function FixedCosts() {
                                             >
                                                 <Trash2 size={14} />
                                             </Button>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
+                            </div>
+                        </div>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -399,41 +394,47 @@ export function FixedCosts() {
                         costs={costs.filter(c => c.category === 'Motoboys')}
                         totalValue={costs.filter(c => c.category === 'Motoboys').reduce((acc, c) => acc + c.monthly_value, 0)}
                     >
-                        <table className="data-table text-sm">
-                            <thead>
-                                <tr>
-                                    <th className="pl-4">Descrição</th>
-                                    <th className="text-right">Diária Fixa</th>
-                                    <th className="text-right">Qtd Motos</th>
-                                    <th className="text-right">Dias/Mês</th>
-                                    <th className="text-right">Total</th>
-                                    <th className="w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div className="w-full text-sm">
+                            <div className="hidden md:grid grid-cols-[1fr_100px_100px_100px_120px_40px] gap-4 px-4 py-3 bg-dark-900/50 text-slate-400 font-medium rounded-t-lg">
+                                <div>Descrição</div>
+                                <div className="text-right">Diária Fixa</div>
+                                <div className="text-right">Qtd Motos</div>
+                                <div className="text-right">Dias/Mês</div>
+                                <div className="text-right">Total</div>
+                                <div className="w-10"></div>
+                            </div>
+
+                            <div className="divide-y divide-dark-700/50 border border-dark-700/50 rounded-b-lg (md:rounded-t-none md:border-t-0 border-t md:border-t-0)">
                                 {costs.filter(c => c.category === 'Motoboys').map(cost => (
-                                    <tr key={cost.id} className="border-b border-dark-700/50 hover:bg-dark-700/30 group">
-                                        <td className="py-2 pl-2">
+                                    <div key={cost.id} className="grid grid-cols-1 md:grid-cols-[1fr_100px_100px_100px_120px_40px] gap-2 md:gap-4 items-center p-3 md:p-4 hover:bg-dark-700/30 group transition-colors">
+                                        <div className="flex flex-col md:block">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Descrição</span>
                                             <input
-                                                className="bg-transparent border-none focus:ring-0 text-white w-full"
+                                                className="bg-transparent border-none focus:ring-0 text-white w-full p-0"
                                                 value={cost.name}
                                                 onChange={e => handleUpdateCost(cost.id, { name: e.target.value })}
                                             />
-                                        </td>
-                                        <td className="py-2 text-right">
-                                            <input type="number" className="input w-20 text-right py-1 h-8"
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Diária Fixa</span>
+                                            <input type="number" className="input w-full md:w-20 text-left md:text-right py-1 h-8"
                                                 value={cost.config?.daily_rate || ''} onChange={e => updateFreightOrFreelancer(cost, 'daily_rate', parseFloat(e.target.value))} />
-                                        </td>
-                                        <td className="py-2 text-right">
-                                            <input type="number" className="input w-16 text-right py-1 h-8"
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Qtd Motos</span>
+                                            <input type="number" className="input w-full md:w-16 text-left md:text-right py-1 h-8"
                                                 value={cost.config?.qty_people || ''} onChange={e => updateFreightOrFreelancer(cost, 'qty_people', parseFloat(e.target.value))} />
-                                        </td>
-                                        <td className="py-2 text-right">
-                                            <input type="number" className="input w-16 text-right py-1 h-8"
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Dias/Mês</span>
+                                            <input type="number" className="input w-full md:w-16 text-left md:text-right py-1 h-8"
                                                 value={cost.config?.days_worked || ''} onChange={e => updateFreightOrFreelancer(cost, 'days_worked', parseFloat(e.target.value))} />
-                                        </td>
-                                        <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
-                                        <td className="py-2 text-center">
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Total</span>
+                                            <span className="font-bold text-white md:text-right w-full block">R$ {cost.monthly_value.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-end md:justify-center mt-2 md:mt-0">
                                             <Button
                                                 variant="danger"
                                                 size="sm"
@@ -442,11 +443,11 @@ export function FixedCosts() {
                                             >
                                                 <Trash2 size={14} />
                                             </Button>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
+                            </div>
+                        </div>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -468,32 +469,31 @@ export function FixedCosts() {
                         costs={costs.filter(c => c.category === 'Lanche' || c.category === 'Lanche Funcionário')}
                         totalValue={costs.filter(c => c.category === 'Lanche' || c.category === 'Lanche Funcionário').reduce((acc, c) => acc + c.monthly_value, 0)}
                     >
-                        <table className="data-table text-sm">
-                            <thead>
-                                <tr>
-                                    <th className="pl-4">Descrição / Produto</th>
-                                    <th className="text-right">Custo Unit.</th>
-                                    <th className="text-right">Dias/Mês</th>
-                                    <th className="text-right">Total</th>
-                                    <th className="w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div className="w-full text-sm">
+                            <div className="hidden md:grid grid-cols-[1fr_120px_100px_120px_40px] gap-4 px-4 py-3 bg-dark-900/50 text-slate-400 font-medium rounded-t-lg">
+                                <div>Descrição / Produto</div>
+                                <div className="text-right">Custo Unit.</div>
+                                <div className="text-right">Dias/Mês</div>
+                                <div className="text-right">Total</div>
+                                <div className="w-10"></div>
+                            </div>
+
+                            <div className="divide-y divide-dark-700/50 border border-dark-700/50 rounded-b-lg (md:rounded-t-none md:border-t-0 border-t md:border-t-0)">
                                 {costs.filter(c => c.category === 'Lanche' || c.category === 'Lanche Funcionário').map(cost => {
                                     const isProduct = !!cost.config?.product_id;
                                     return (
-                                        <tr key={cost.id} className="border-b border-dark-700/50 hover:bg-dark-700/30 group">
-                                            <td className="py-2 pl-2">
+                                        <div key={cost.id} className="grid grid-cols-1 md:grid-cols-[1fr_120px_100px_120px_40px] gap-2 md:gap-4 items-center p-3 md:p-4 hover:bg-dark-700/30 group transition-colors">
+                                            <div className="flex flex-col md:block">
+                                                <span className="text-xs text-slate-500 mb-1 md:hidden">Descrição / Produto</span>
                                                 <div className="flex items-center gap-2">
                                                     <select
-                                                        className="bg-transparent text-xs text-primary border-none outline-none cursor-pointer font-bold"
+                                                        className="bg-transparent text-xs text-primary border-none outline-none cursor-pointer font-bold px-0"
                                                         value={isProduct ? 'product' : 'manual'}
                                                         onChange={e => {
                                                             const mode = e.target.value as 'product' | 'manual';
                                                             if (mode === 'manual') {
                                                                 updateSnack(cost, 'manual', 0, undefined, cost.config?.monthly_qty);
                                                             } else {
-                                                                // Switch to product mode: pick first product if available
                                                                 if (products.length > 0) {
                                                                     updateSnack(cost, 'product', undefined, products[0].id, cost.config?.monthly_qty);
                                                                 } else {
@@ -507,7 +507,7 @@ export function FixedCosts() {
                                                     </select>
                                                     {isProduct ? (
                                                         <select
-                                                            className="bg-dark-700 border border-dark-600 rounded text-white text-sm px-2 py-1 flex-1 max-w-[200px]"
+                                                            className="bg-dark-700 border border-dark-600 rounded text-white text-sm px-2 py-1 flex-1 min-w-0"
                                                             value={cost.config?.product_id || ''}
                                                             onChange={e => updateSnack(cost, 'product', undefined, parseInt(e.target.value), cost.config?.monthly_qty)}
                                                         >
@@ -518,27 +518,32 @@ export function FixedCosts() {
                                                         </select>
                                                     ) : (
                                                         <input
-                                                            className="bg-transparent border-none focus:ring-0 text-white flex-1"
+                                                            className="bg-transparent border-none focus:ring-0 text-white flex-1 min-w-0 p-0"
                                                             value={cost.name}
                                                             onChange={e => handleUpdateCost(cost.id, { name: e.target.value })}
                                                             placeholder="Queijo, pão, café..."
                                                         />
                                                     )}
                                                 </div>
-                                            </td>
-                                            <td className="py-2 text-right">
+                                            </div>
+                                            <div className="flex flex-col md:block items-start md:items-end">
+                                                <span className="text-xs text-slate-500 mb-1 md:hidden">Custo Unit.</span>
                                                 {isProduct ?
-                                                    <span className="text-slate-400">R$ {(cost.config?.unit_cost || 0).toFixed(2)}</span> :
-                                                    <input type="number" className="input w-20 text-right py-1 h-8"
+                                                    <span className="text-slate-400 mt-1 block">R$ {(cost.config?.unit_cost || 0).toFixed(2)}</span> :
+                                                    <input type="number" className="input w-full md:w-20 text-left md:text-right py-1 h-8"
                                                         value={cost.config?.unit_cost || ''} onChange={e => updateSnack(cost, 'manual', parseFloat(e.target.value), undefined, cost.config?.monthly_qty)} />
                                                 }
-                                            </td>
-                                            <td className="py-2 text-right">
-                                                <input type="number" className="input w-16 text-right py-1 h-8"
+                                            </div>
+                                            <div className="flex flex-col md:block items-start md:items-end">
+                                                <span className="text-xs text-slate-500 mb-1 md:hidden">Dias/Mês</span>
+                                                <input type="number" className="input w-full md:w-16 text-left md:text-right py-1 h-8"
                                                     value={cost.config?.monthly_qty || ''} onChange={e => updateSnack(cost, isProduct ? 'product' : 'manual', cost.config?.unit_cost, cost.config?.product_id, parseFloat(e.target.value))} />
-                                            </td>
-                                            <td className="py-2 text-right font-bold text-white">R$ {cost.monthly_value.toFixed(2)}</td>
-                                            <td className="py-2 text-center">
+                                            </div>
+                                            <div className="flex flex-col md:block items-start md:items-end">
+                                                <span className="text-xs text-slate-500 mb-1 md:hidden">Total</span>
+                                                <span className="font-bold text-white md:text-right w-full block">R$ {cost.monthly_value.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-end md:justify-center mt-2 md:mt-0">
                                                 <Button
                                                     variant="danger"
                                                     size="sm"
@@ -547,12 +552,12 @@ export function FixedCosts() {
                                                 >
                                                     <Trash2 size={14} />
                                                 </Button>
-                                            </td>
-                                        </tr>
+                                            </div>
+                                        </div>
                                     );
                                 })}
-                            </tbody>
-                        </table>
+                            </div>
+                        </div>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -569,30 +574,30 @@ export function FixedCosts() {
             {/* --- EXPENSES TAB CONTENT --- */}
             {activeTab === 'Despesas' && (
                 <div className="space-y-6">
-                    {/* General/Other Table */}
                     <div className="glass-card overflow-hidden">
-                        <table className="data-table text-sm">
-                            <thead>
-                                <tr>
-                                    <th className="pl-4">Descrição</th>
-                                    <th className="text-left">Categoria</th>
-                                    <th className="text-right">Valor Mensal</th>
-                                    <th className="w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div className="w-full text-sm">
+                            <div className="hidden md:grid grid-cols-[1fr_200px_150px_40px] gap-4 px-4 py-3 bg-dark-900/50 text-slate-400 font-medium border-b border-dark-700/50">
+                                <div>Descrição</div>
+                                <div className="text-left">Categoria</div>
+                                <div className="text-right">Valor Mensal</div>
+                                <div className="w-10"></div>
+                            </div>
+
+                            <div className="divide-y divide-dark-700/50">
                                 {currentTabCosts.map(cost => (
-                                    <tr key={cost.id} className="border-b border-dark-700/50 hover:bg-dark-700/30 group">
-                                        <td className="py-2 pl-2">
+                                    <div key={cost.id} className="grid grid-cols-1 md:grid-cols-[1fr_200px_150px_40px] gap-2 md:gap-4 items-center p-3 md:p-4 hover:bg-dark-700/30 group transition-colors">
+                                        <div className="flex flex-col md:block">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Descrição</span>
                                             <input
-                                                className="bg-transparent border-none focus:ring-0 text-white w-full"
+                                                className="bg-transparent border-none focus:ring-0 text-white w-full p-0"
                                                 value={cost.name}
                                                 onChange={e => handleUpdateCost(cost.id, { name: e.target.value })}
                                             />
-                                        </td>
-                                        <td className="py-2">
+                                        </div>
+                                        <div className="flex flex-col md:block items-start">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Categoria</span>
                                             <select
-                                                className="bg-transparent border-none outline-none text-slate-400 text-xs w-full"
+                                                className="bg-transparent border border-dark-600 md:border-none focus:ring-0 outline-none text-slate-300 md:text-slate-400 text-sm md:text-xs w-full p-1 md:p-0 rounded"
                                                 value={cost.category}
                                                 onChange={e => handleUpdateCost(cost.id, { category: e.target.value })}
                                             >
@@ -602,16 +607,17 @@ export function FixedCosts() {
                                                 <option value="Marketing">Marketing</option>
                                                 <option value="Sistemas/Outros">Sistemas/Outros</option>
                                             </select>
-                                        </td>
-                                        <td className="py-2 text-right">
+                                        </div>
+                                        <div className="flex flex-col md:block items-start md:items-end">
+                                            <span className="text-xs text-slate-500 mb-1 md:hidden">Valor Mensal</span>
                                             <input
                                                 type="number"
-                                                className="input w-32 text-right py-1 h-8"
+                                                className="input w-full md:w-32 text-left md:text-right py-1 h-8"
                                                 value={cost.monthly_value || ''}
                                                 onChange={e => handleUpdateCost(cost.id, { monthly_value: parseFloat(e.target.value) || 0 })}
                                             />
-                                        </td>
-                                        <td className="py-2 text-center">
+                                        </div>
+                                        <div className="flex justify-end md:justify-center mt-2 md:mt-0">
                                             <Button
                                                 variant="danger"
                                                 size="sm"
@@ -620,20 +626,22 @@ export function FixedCosts() {
                                             >
                                                 <Trash2 size={14} />
                                             </Button>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleAddCost('Aluguel & Contas')}
-                            className="mt-4 text-xs text-primary hover:text-white font-medium uppercase tracking-wider"
-                            leftIcon={<Plus size={14} />}
-                        >
-                            Adicionar Nova Despesa
-                        </Button>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-dark-800/20 border-t border-dark-700/50">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleAddCost('Aluguel & Contas')}
+                                className="text-xs text-primary hover:text-white font-medium uppercase tracking-wider"
+                                leftIcon={<Plus size={14} />}
+                            >
+                                Adicionar Nova Despesa
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -641,7 +649,6 @@ export function FixedCosts() {
     );
 }
 
-// Helper Component for Accordion Sections
 function CostSection({ title, icon: Icon, color, isOpen, onToggle, costs, totalValue, children }: any) {
     return (
         <div className="glass-card overflow-hidden transition-all duration-300">
@@ -671,11 +678,6 @@ function CostSection({ title, icon: Icon, color, isOpen, onToggle, costs, totalV
                                 title={`Nenhum custo cadastrado`}
                                 description={`Adicione itens em "${title}" para começar a controlar seus gastos.`}
                             />
-                            {/* We want to show the specific add button, which is in 'children' usually at the bottom. 
-                                But 'children' contains the table too. 
-                                We should probably just render children as is, but maybe hide table?
-                                Actually, the existing 'children' has a table and a button.
-                            */}
                             <div className="mt-4">{children}</div>
                         </div>
                     ) : (
